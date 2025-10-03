@@ -73,21 +73,6 @@ OgaTree::~OgaTree(){
     }
 }
 
-double OgaTree::getCompressionRate() const{
-
-    int total_abs_nodes = 0;
-    for (const auto& val: abstract_state_nodes | std::views::values)
-        total_abs_nodes += val.size();
-    double state_compression = static_cast<double>(d_states.size()) / static_cast<double>(total_abs_nodes);
-
-    int total_abs_q_nodes = 0;
-    for (const auto& val: abstract_q_state_nodes | std::views::values)
-        total_abs_q_nodes += val.size();
-    double q_state_compression = static_cast<double>(q_states.size()) / static_cast<double>(total_abs_q_nodes);
-
-    return std::max(state_compression, q_state_compression);
-}
-
 OgaStateNode* OgaTree::getRoot() const
 {
     return root;

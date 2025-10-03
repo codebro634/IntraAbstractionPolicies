@@ -72,9 +72,6 @@ namespace OGA {
         void addUpdateQStateNodeAbstraction(OgaQStateNode* q_state_node);
         void addUpdateStateNodeAbstraction(OgaStateNode* state_node);
 
-        //For smart abstraction dropping
-        double getCompressionRate() const;
-
         //For improved state abs
         void update_next_distrs(OgaStateNode* node, OgaSearchStats& search_stats);
         bool distrSimilarity(NextAbstractQStates* nd1, NextAbstractQStates* nf1, NextAbstractQStates* nd2, NextAbstractQStates* nf2, OgaStateNode* s1, OgaStateNode* s2);

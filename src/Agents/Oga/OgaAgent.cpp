@@ -61,16 +61,12 @@ int OgaAgent::getAction(ABS::Model* model, ABS::Gamestate* state, std::mt19937& 
         search_stats.completed_iterations++;
         search_stats.total_forward_calls = model->getForwardCalls() - total_forward_calls_before;
 
-        double done_ratio = 0.0;
         if(budget.quantity == "iterations"){
             done = search_stats.completed_iterations >= budget.amount;
-            done_ratio = static_cast<double>(search_stats.completed_iterations) / budget.amount;
         } else if (budget.quantity == "forward_calls"){
             done = static_cast<int>(search_stats.total_forward_calls) >= budget.amount;
-            done_ratio = static_cast<double>(search_stats.total_forward_calls) / budget.amount;
         } else if (budget.quantity == "milliseconds"){
             done = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - start).count() >= budget.amount;
-            done_ratio = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - start).count() / budget.amount;
         }
     }
 
