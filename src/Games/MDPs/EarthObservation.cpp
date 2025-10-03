@@ -20,13 +20,8 @@ void Model::getObs(ABS::Gamestate* uncasted_state, int* obs) {
     return {4};
 }
 
-int Model::encodeAction(ABS::Gamestate* uncasted_state, int* decoded_action, bool* valid) {
-    auto state = dynamic_cast<Gamestate*>(uncasted_state);
-    auto actions = std::vector<int>();
-    int a = decoded_action[0];
-    int test_idx = a == 3? 2 : a;
-    *valid= connection_per_direction[state->focal_point][test_idx] != -1;
-    return a;
+int Model::encodeAction(int* decoded_action) {
+   return decoded_action[0];
 }
 
 bool Gamestate::operator==(const ABS::Gamestate& o) const {

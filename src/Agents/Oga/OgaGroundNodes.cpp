@@ -8,13 +8,14 @@
 #include <cassert>
 #include <fstream>
 #include <algorithm>
+#include <cstring>
 
 #include "../../../include/Utils/Distributions.h"
 
 using namespace OGA;
 
-unsigned OgaStateNode::max_id = 0;
-OgaStateNode::OgaStateNode(ABS::Gamestate* state, const unsigned depth) : id(max_id++), state(state), depth(depth)
+OgaStateNode::OgaStateNode(ABS::Gamestate* state, const unsigned depth, OgaSearchStats& search_stats)
+: id(search_stats.max_state_id++), state(state), depth(depth)
 {}
 
 OgaStateNode::~OgaStateNode(){
@@ -45,7 +46,7 @@ unsigned OgaStateNode::getVisits() const{
     return visits;
 }
 
-void OgaStateNode::initUntriedActions(const std::vector<int>& actions, std::mt19937& rng){
+void OgaStateNode::initUntriedActions(ABS::Model* model, const std::vector<int>& actions, std::mt19937& rng){
     untried_actions = actions;
     std::ranges::shuffle(untried_actions.begin(), untried_actions.end(), rng);
 }
@@ -117,11 +118,9 @@ size_t OgaStateNode::hash() const{
 
 // OgaQStateNode
 
-unsigned OgaQStateNode::max_id = 0;
-OgaQStateNode::OgaQStateNode(ABS::Gamestate* state, const unsigned depth, const int action) : id(max_id++), state(state),
+OgaQStateNode::OgaQStateNode(ABS::Gamestate* state, const unsigned depth, const int action, OgaSearchStats& search_stats) : id(search_stats.max_q_id++), state(state),
     depth(depth), action(action)
-{
-}
+{}
 
 OgaQStateNode::~OgaQStateNode(){
     delete state;
@@ -160,7 +159,6 @@ double OgaQStateNode::getAbsVisits() const{
 double OgaQStateNode::getAbsValues() const{
     return abstract_node->getValues();
 }
-
 
 void OgaQStateNode::addExperience(double values){
     getAbstractNode()->addExperience(values);

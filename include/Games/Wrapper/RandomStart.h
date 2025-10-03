@@ -58,8 +58,8 @@ namespace RANDOMSTART
             original_model->getObs(dynamic_cast<Gamestate*>(uncasted_state)->ground_state, obs);
         }
 
-        [[nodiscard]] int encodeAction(ABS::Gamestate* state, int* decoded_action, bool* valid) override {
-            return original_model->encodeAction(dynamic_cast<Gamestate*>(state)->ground_state, decoded_action, valid);
+        [[nodiscard]] int encodeAction(int* decoded_action) override {
+            return original_model->encodeAction(decoded_action);
         }
 
     private:

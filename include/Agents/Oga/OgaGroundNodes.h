@@ -1,9 +1,12 @@
 #ifndef OGAGROUNDNODES_H
 #define OGAGROUNDNODES_H
 
+#include <map>
+
 #include "OgaUtils.h"
 
 namespace OGA {
+    struct OgaSearchStats;
 
     //Forward declarations
     class OgaQStateNode;
@@ -13,7 +16,6 @@ namespace OGA {
     {
     private:
         // Information that identifies the node
-        static unsigned max_id;
         unsigned id;
         ABS::Gamestate* state;
         unsigned depth;
@@ -22,7 +24,7 @@ namespace OGA {
         unsigned visits = 0;
         std::vector<int> tried_actions{};
         std::vector<int> untried_actions{};
-        std::vector<OgaQStateNode*> children{}; // Cached for better performance
+        std::vector<OgaQStateNode*> children{};
 
         // OGA bookkeeping
         OgaAbstractStateNode* abstract_node = nullptr;
@@ -32,12 +34,15 @@ namespace OGA {
 
         // Temporarily store the trajectory path and rewards to be able to do backpropagation
         OgaQStateNode* trajectory_parent = nullptr;
+        unsigned recency_count = 0;
+        bool has_received_abs_update = false;
 
     public:
 
         OgaStateNode(
             ABS::Gamestate* state,
-            unsigned depth
+            unsigned depth,
+            OgaSearchStats& search_stats
         );
 
         ~OgaStateNode();
@@ -54,7 +59,7 @@ namespace OGA {
         // MCTS bookkeeping functions
         void addVisit();
         [[nodiscard]] unsigned getVisits() const;
-        void initUntriedActions(const std::vector<int>& actions, std::mt19937& rng);
+        void initUntriedActions(ABS::Model* model, const std::vector<int>& actions, std::mt19937& rng);
         [[nodiscard]] int popUntriedAction();
         [[nodiscard]] bool isFullyExpanded() const;
         [[nodiscard]] bool isPartiallyExpanded() const;
@@ -68,6 +73,11 @@ namespace OGA {
         void setAbstractNode(OgaAbstractStateNode* abstract_node);
         [[nodiscard]] OgaAbstractStateNode* getAbstractNode() const;
         [[nodiscard]] const Set<OgaQStateNode>& getParents() const;
+        [[nodiscard]] unsigned getRecencyCount() const { return recency_count; }
+        void addRecencyCount() { recency_count++; }
+        void resetRecencyCount() { recency_count = 0; }
+        void setReceivedAbsUpdate(bool received) { has_received_abs_update = received; }
+        [[nodiscard]] bool hasReceivedAbsUpdate() const { return has_received_abs_update; }
 
         // Trajectory functions
         void setTrajectoryParent(OgaQStateNode* parent);
@@ -82,7 +92,6 @@ namespace OGA {
     class OgaQStateNode
     {
     private:
-        static unsigned max_id;
         unsigned id;
 
         // Information that identifies the node
@@ -103,12 +112,15 @@ namespace OGA {
         std::vector<double> rewards{}; // For q state abstractions, a q state needs a deterministic reward (cost)
         unsigned recency_count = 0;
 
+        bool use_ground_stats = false;
+        bool has_received_abs_update = false;
     public:
 
         OgaQStateNode(
             ABS::Gamestate* state,
             unsigned depth,
-            int action
+            int action,
+            OgaSearchStats& search_stats
         );
 
         ~OgaQStateNode();
@@ -125,6 +137,8 @@ namespace OGA {
         void addExperience(double values);
         [[nodiscard]] double getAbsVisits() const;
         [[nodiscard]] double getAbsValues() const;
+        [[nodiscard]] bool hasReceivedAbsUpdate() const { return has_received_abs_update; }
+        void setReceivedAbsUpdate(bool received) { has_received_abs_update = received; }
         double getProbSum() const { return prob_sum; }
 
         // OGA bookkeeping functions

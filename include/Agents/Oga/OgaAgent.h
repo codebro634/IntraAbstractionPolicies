@@ -23,6 +23,12 @@ namespace OGA
         unsigned total_forward_calls{};
         unsigned max_depth{};
 
+        // For node id tracking
+        unsigned max_abs_state_id = 0;
+        unsigned max_abs_q_id = 0;
+        unsigned max_state_id = 0;
+        unsigned max_q_id = 0;
+
         //For global std exploration factor
         double total_squared_v{};
         double total_v{};
@@ -38,6 +44,10 @@ namespace OGA
         int num_rollouts = 1;
         int rollout_length = -1;
         OgaBehaviorFlags behavior_flags;
+
+        /*
+         * For abstraction dropping
+         */
 
         //For in abs-decision policy
         std::string in_abs_policy = "random"; //random, uct
@@ -56,9 +66,11 @@ namespace OGA
         OgaStateNode* selectSuccessorState(OgaTree* tree, OgaStateNode* node, ABS::Model* model, OgaSearchStats& search_stats, std::mt19937& rng,
                                            bool* new_state);
         OgaStateNode* treePolicy(OgaTree* tree, ABS::Model* model, OgaSearchStats& search_stats, std::mt19937& rng);
+
         std::vector<double> rollout(const OgaStateNode* leaf, ABS::Model* model, std::mt19937& rng) const;
+
         void backup(OgaTree* tree, OgaStateNode* leaf, std::vector<double> values, OgaSearchStats& search_stats) const;
-        int selectAction(const OgaStateNode* node, bool greedy, OgaSearchStats& search_stats, std::mt19937& rng);
+        int selectAction(ABS::Model* model, OgaStateNode* node, bool greedy, OgaSearchStats& search_stats, std::mt19937& rng);
 
         double exploration_parameter;
         double discount;
@@ -82,6 +94,8 @@ namespace OGA
 
     public:
         explicit OgaAgent(const OgaArgs& args);
+        ~OgaAgent() override;
+
         int getAction(ABS::Model* model, ABS::Gamestate* state, std::mt19937& rng) override;
         int getAction(ABS::Model* model, ABS::Gamestate* state, std::mt19937& rng, OgaTree** treePtr); // Used for testing
 

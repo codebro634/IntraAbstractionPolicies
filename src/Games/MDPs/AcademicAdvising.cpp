@@ -28,7 +28,7 @@ void Model::getObs(ABS::Gamestate* uncasted_state, int* obs) {
         return {static_cast<int>(prereqs.size() + idle)};
 }
 
-int Model::encodeAction(ABS::Gamestate* state, int* decoded_action, bool* valid) {
+int Model::encodeAction(int* decoded_action) {
     if (simultaneous_actions) {
         int c1 = decoded_action[0]- (idle_action? 1:0);
         int c2 = decoded_action[1]- (idle_action? 1:0);

@@ -11,7 +11,7 @@
 using namespace Navigation;
 
 std::vector<int> Model::obsShape() const {
-    return {1,1}; // x and y coordinate
+    return {2}; // x and y coordinate
 }
 
 void Model::getObs(ABS::Gamestate* uncasted_state, int* obs) {
@@ -24,10 +24,8 @@ void Model::getObs(ABS::Gamestate* uncasted_state, int* obs) {
     return {static_cast<int>(4 + (idle_action ? 1 : 0))}; // 4 directions + idle action
 }
 
-int Model::encodeAction(ABS::Gamestate* state, int* decoded_action, bool* valid) {
-    int a = decoded_action[0] - (static_cast<int>(idle_action));
-    *valid = a == -1 || isAllowedAction(state, a);
-    return a;
+int Model::encodeAction(int* decoded_action) {
+    return decoded_action[0] - (static_cast<int>(idle_action));
 }
 
 double Model::getDistance(const ABS::Gamestate* a, const ABS::Gamestate* b) const {
@@ -121,25 +119,25 @@ std::pair<std::vector<double>,double> Model::applyAction_(ABS::Gamestate* uncast
         default: break; // Unreachable
     }
 
-    if (state->position == goal)
-    {
+    if (state->position == goal){
         state->terminal = true;
         return {{0}, 1.0};
     }
 
-    if (state->position == spawn)
-    {
-        return {{-1}, 1.0};
+    double reward = -1 + (state_dependent_rewards? (state->position.first * 10 + state->position.second) / 1000.0 : 0);
+
+    if (state->position == spawn){
+        return {{reward}, 1.0};
     }
 
     double prob = map[state->position.second][state->position.first];
     if ( (decision_outcomes == nullptr && dist(rng) < prob) || (decision_outcomes != nullptr && (prob == 1 || (prob != 0 && getDecisionPoint(decision_point, 0, 1, decision_outcomes) == 0))))
     {
         state->position = spawn;
-        return {{-1},  prob};
+        return {{reward},  prob};
     }
 
-    return {{-1}, 1 - prob};
+    return {{reward}, 1 - prob};
 }
 
 ABS::Gamestate* Model::getInitialState(std::mt19937& rng) {
@@ -148,12 +146,9 @@ ABS::Gamestate* Model::getInitialState(std::mt19937& rng) {
     return state;
 }
 
-Model::Model(const std::string& fileName, bool idle_action) : dist(0.0, 1.0), idle_action(idle_action)
-{
+Model::Model(const std::string& fileName, bool idle_action, bool state_dependent_rewards) : dist(0.0, 1.0), idle_action(idle_action), state_dependent_rewards(state_dependent_rewards){
     std::ifstream file(fileName);
-
-    if (!file.is_open())
-    {
+    if (!file.is_open()){
         std::cerr << "Could not open file " << fileName << std::endl;
         exit(1);
     }
@@ -161,8 +156,7 @@ Model::Model(const std::string& fileName, bool idle_action) : dist(0.0, 1.0), id
     std::string line;
 
     // Get start and goal
-    if (std::getline(file, line))
-    {
+    if (std::getline(file, line)){
         std::istringstream iss(line);
         std::string number;
         std::vector<int> start;
@@ -170,8 +164,7 @@ Model::Model(const std::string& fileName, bool idle_action) : dist(0.0, 1.0), id
         spawn = {start[0], start[1]};
     }
 
-    if (std::getline(file, line))
-    {
+    if (std::getline(file, line)){
         std::istringstream iss(line);
         std::string number;
         std::vector<int> goal;
@@ -179,8 +172,7 @@ Model::Model(const std::string& fileName, bool idle_action) : dist(0.0, 1.0), id
         this->goal = {goal[0], goal[1]};
     }
 
-    while (std::getline(file, line))
-    {
+    while (std::getline(file, line)){
         std::vector<double> row;
         std::istringstream iss(line);
         std::string number;

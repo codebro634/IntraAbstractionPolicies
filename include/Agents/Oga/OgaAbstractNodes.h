@@ -2,25 +2,25 @@
 #define OGAABSTRACTNODES_H
 #include <set>
 
+#include "OgaAgent.h"
 #include "OgaGroundNodes.h"
 
 namespace OGA {
 
- class OgaAbstractNode
+    class OgaAbstractNode
     {
     private:
-        static unsigned max_id;
-        unsigned id;
-        unsigned depth;
         void* key = nullptr;
         unsigned count = 0;
+        unsigned id;
+        unsigned depth;
 
     protected:
+        OgaAbstractNode(const unsigned depth, unsigned id) : id(id), depth(depth) {}
         void increaseCount();
         void decreaseCount();
 
     public:
-        explicit OgaAbstractNode(unsigned depth);
 
         [[nodiscard]] unsigned getId() const;
         [[nodiscard]] unsigned getDepth() const;
@@ -41,6 +41,8 @@ namespace OGA {
     {
     public:
         using OgaAbstractNode::OgaAbstractNode;
+
+        explicit OgaAbstractStateNode(unsigned depth, OgaSearchStats& search_stats): OgaAbstractNode(depth, search_stats.max_abs_state_id++) {}
 
         static void transfer(OgaStateNode* state_node, OgaAbstractStateNode* from, OgaAbstractStateNode* to, AbsStateSet& abstract_state_nodes);
         void add(OgaStateNode* state_node);
@@ -70,14 +72,10 @@ namespace OGA {
         double visits = 0;
         double squared_values = 0; //only needed for std calculation for OGA-CAD (abs dropping)
 
-        void _add_approx(const OgaQStateNode* q_state_node);
-        void _remove_approx(const OgaQStateNode* q_state_node);
-
-        void _add_exact(const OgaQStateNode* q_state_node);
-        void _remove_exact(const OgaQStateNode* q_state_node);
-
     public:
         using OgaAbstractNode::OgaAbstractNode;
+        explicit OgaAbstractQStateNode(unsigned depth, OgaSearchStats& search_stats): OgaAbstractNode(depth, search_stats.max_abs_q_id++) {}
+
         [[nodiscard]] double getValues() const;
         [[nodiscard]] double getSquaredValues() const;
         [[nodiscard]] double getVisits() const;
@@ -86,9 +84,13 @@ namespace OGA {
         void addExperience(double values);
         std::set<OgaQStateNode*>& getGroundNodes() { return ground_nodes; }
 
-        static void transfer(OgaQStateNode* q_state_node, OgaAbstractQStateNode* from, OgaAbstractQStateNode* to, AbsQSet& abs_q_set, bool exact_bookkeeping, OgaBehaviorFlags& flags);
-        void add(OgaQStateNode* q_state_node, bool exact_bookkeeping);
-        void remove(OgaQStateNode* q_state_node, bool exact_bookkeeping);
+        static void transfer(OgaQStateNode* q_state_node, OgaAbstractQStateNode* from, OgaAbstractQStateNode* to, AbsQSet& abs_q_set, OgaBehaviorFlags& flags);
+        void add(OgaQStateNode* q_state_node, OgaBehaviorFlags& flags);
+        void remove(OgaQStateNode* q_state_node, OgaBehaviorFlags& flags);
+        void addValues(double amount) { values += amount; }
+
+        //For debugging
+        void testValueConsistency() const;
     };
 
     struct AbsQCompare{

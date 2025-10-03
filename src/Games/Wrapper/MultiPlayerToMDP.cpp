@@ -7,29 +7,29 @@ using namespace std;
 using namespace MPTOMDP;
 
 
-bool Gamestate::operator==(const ABS::Gamestate& other) const
-{
+bool Gamestate::operator==(const ABS::Gamestate& other) const{
     auto* other_state = dynamic_cast<const Gamestate*>(&other);
-    return *other_state->ground_state == *ground_state;
+    return *other_state->ground_state == *ground_state && opponent_seed == other_state->opponent_seed;
 }
 
-size_t Gamestate::hash() const
-{
-    return ground_state->hash();
+size_t Gamestate::hash() const{
+    return ground_state->hash() ^ (static_cast<size_t>(opponent_seed) << 16); //hash the ground state and the opponent seed
 }
 
 Model::~Model(){
-    delete original_model;
+    if (free_ground_model)
+        delete original_model;
     for(auto& [_,agent] : agents)
         delete agent;
 }
 
-Model::Model(ABS::Model* original_model,std::map<int,Agent*> agents, double discount, int player, bool deterministic_opponents){
+Model::Model(ABS::Model* original_model,std::map<int,Agent*> agents, double discount, int player, bool deterministic_opponents, bool free_ground_model){
     this->original_model = original_model;
     this->agents = agents;
     this->discount = discount;
     this->player = player;
     this->deterministic_opponents = deterministic_opponents;
+    this->free_ground_model = free_ground_model;
 
     for (int i = 0; i < original_model->getNumPlayers(); i++){
         assert (i == player || agents.contains(i));
@@ -58,6 +58,7 @@ ABS::Gamestate* Model::getInitialState(int num) {
     ABS::Gamestate* ostate = original_model->getInitialState(num);
     auto state = new Gamestate();
     state->ground_state = ostate;
+    state->opponent_seed = num;
     std::mt19937 rng(static_cast<unsigned int>(num + state->hash()));
     playTillNextTurn(state, rng);
     return state;
@@ -67,7 +68,9 @@ ABS::Gamestate* Model::getInitialState(std::mt19937& rng){
     ABS::Gamestate* ostate = original_model->getInitialState(rng);
     auto state = new Gamestate();
     state->ground_state = ostate;
-    std::mt19937 agents_rng(static_cast<unsigned int>(ENEMY_SEED + deterministic_opponents? state->hash() : 0)); // : 0 only for computational speedup
+    std::uniform_int_distribution<int> dist(0, 10000000);
+    state->opponent_seed = dist(rng);
+    std::mt19937 agents_rng(static_cast<unsigned int>(state->opponent_seed + (deterministic_opponents? state->hash() : 0))); // : 0 only for computational speedup
     playTillNextTurn(state, deterministic_opponents? agents_rng : rng);
     return state;
 }
@@ -84,6 +87,7 @@ ABS::Gamestate* Model::copyState(ABS::Gamestate* uncasted_state) {
     auto copy = new Gamestate();
     copy->ground_state = original_model->copyState(dynamic_cast<Gamestate*>(uncasted_state)->ground_state);
     copy->terminal = dynamic_cast<Gamestate*>(uncasted_state)->terminal;
+    copy->opponent_seed = dynamic_cast<Gamestate*>(uncasted_state)->opponent_seed;
     return copy;
 }
 
@@ -97,7 +101,7 @@ std::pair<std::vector<double>,double> Model::applyAction_(ABS::Gamestate* uncast
     auto [rewards, prob] = original_model->applyAction(casted_state->ground_state, action, rng, nullptr);
     casted_state->terminal |= casted_state->ground_state->terminal;
 
-    std::mt19937 agents_rng(static_cast<unsigned int>(ENEMY_SEED + deterministic_opponents? uncasted_state->hash() : 0)); // : 0 only for computational speedup
+    std::mt19937 agents_rng(static_cast<unsigned int>(casted_state->opponent_seed + deterministic_opponents? uncasted_state->hash() : 0)); // : 0 only for computational speedup
     auto [additional_rews, additional_prob] = playTillNextTurn(casted_state, deterministic_opponents? agents_rng : rng);
 
     return {{rewards[player] + discount * additional_rews}, prob * additional_prob};

@@ -13,16 +13,22 @@ namespace OGA {
     class OgaAbstractStateNode;
     class NextDistribution;
 
-    struct OgaBehaviorFlags
-    {
-        bool exact_bookkeeping : 1 = true;
+    struct OgaBehaviorFlags{
+
         bool group_terminal_states : 1 = true;
         bool group_partially_expanded_states : 1 = false;
         unsigned int partial_expansion_group_threshold = std::numeric_limits<int>::max();
 
         //For non-exact abstractions
+        std::string q_abs_alg = "eps"; //vals: 'eps', 'random'
         double eps_a = 0;
         double eps_t = 0;
+        bool consider_missing_outcomes = false; //If true, missing outcomes are considered in the distribution distance
+        double alpha = 0; //for pruned-oga
+
+        //For value-based state abstractions
+        std::string state_abs_alg = "asap"; //vals: 'asap'
+        double equiv_chance = 0.01; //for random abstraction updates
     };
 
     class OgaStateNode;
@@ -63,9 +69,11 @@ namespace OGA {
     private:
         Map<OgaAbstractStateNode, double> distribution{};
         double rewards;
+        bool consider_missing_outcomes;
 
     public:
-        explicit NextDistribution(const double rewards);
+
+        explicit NextDistribution(const double rewards, bool consider_missing_outcomes);
         void addProbability(OgaAbstractStateNode* next_abstract_state_node, double probability);
 
         double getRewards() const;
@@ -76,8 +84,6 @@ namespace OGA {
 
         [[nodiscard]] double dist(const NextDistribution* other) const;
         bool approxEqual(const NextDistribution* other, double exp_a, double exp_t) const;
-        bool operator==(const NextDistribution& other) const;
-        [[nodiscard]] size_t hash() const;
     };
 
     class NextAbstractQStates

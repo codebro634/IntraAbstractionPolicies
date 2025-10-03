@@ -26,7 +26,7 @@ void Model::getObs(ABS::Gamestate* uncasted_state, int* obs) {
     return {static_cast<int>(connections.size() + 1)};
 }
 
-int Model::encodeAction(ABS::Gamestate* state, int* decoded_action, bool* valid) {
+int Model::encodeAction(int* decoded_action) {
     return decoded_action[0];
 }
 

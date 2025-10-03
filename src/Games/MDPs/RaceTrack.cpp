@@ -12,37 +12,46 @@ using namespace std;
 using namespace RT;
 
 std::vector<int> Model::obsShape() const {
-    return {6,(int)obstacle_map.size(),(int)obstacle_map[0].size()};
+    if (simplified_observation_space)
+        return {4};
+    else
+        return {6,(int)obstacle_map.size(),(int)obstacle_map[0].size()};
 }
 
 void Model::getObs(ABS::Gamestate* uncasted_state, int* obs) {
     auto state= dynamic_cast<RT::Gamestate*>(uncasted_state);
-    int msize = obstacle_map.size() * obstacle_map[0].size();
-    for (int i = 0; i < (int)obstacle_map.size(); i++) {
-        for (int j = 0; j < (int)obstacle_map[0].size(); j++) {
-            obs[0*msize + i * obstacle_map[0].size() + j] = obstacle_map[i][j] ? 1 : 0;
-            obs[1*msize + i * obstacle_map[0].size() + j] = goal_map[i][j] ? 1 : 0;
-            obs[2*msize + i * obstacle_map[0].size() + j] = state->x == i && state->y == j ? 1 : 0;
-            obs[3*msize + i * obstacle_map[0].size() + j] = state->dx;
-            obs[4*msize + i * obstacle_map[0].size() + j] = state->dy;
-            obs[5*msize + i * obstacle_map[0].size() + j] = 0;
+
+    if (simplified_observation_space) {
+        obs[0] = state->x;
+        obs[1] = state->y;
+        obs[2] = state->dx;
+        obs[3] = state->dy;
+    }else {
+        int msize = obstacle_map.size() * obstacle_map[0].size();
+        for (int i = 0; i < (int)obstacle_map.size(); i++) {
+            for (int j = 0; j < (int)obstacle_map[0].size(); j++) {
+                obs[0*msize + i * obstacle_map[0].size() + j] = obstacle_map[i][j] ? 1 : 0;
+                obs[1*msize + i * obstacle_map[0].size() + j] = goal_map[i][j] ? 1 : 0;
+                obs[2*msize + i * obstacle_map[0].size() + j] = state->x == i && state->y == j ? 1 : 0;
+                obs[3*msize + i * obstacle_map[0].size() + j] = state->dx;
+                obs[4*msize + i * obstacle_map[0].size() + j] = state->dy;
+                obs[5*msize + i * obstacle_map[0].size() + j] = 0;
+            }
         }
+        for (auto start : start_positions)
+            obs[5*msize + start.first * obstacle_map[0].size() + start.second] = 1;
     }
-    for (auto start : start_positions)
-        obs[5*msize + start.first * obstacle_map[0].size() + start.second] = 1;
 }
 
 [[nodiscard]] std::vector<int> Model::actionShape() const {
     return {3,3};
 }
 
-int Model::encodeAction(ABS::Gamestate* state, int* decoded_action, bool* valid) {
-    int action = decoded_action[1] + 3 * decoded_action[0];
-    *valid = true;
-    return action;
+int Model::encodeAction(int* decoded_action) {
+    return decoded_action[1] + 3 * decoded_action[0];
 }
 
-Model::Model(const std::string& fileName, double fail_prob, bool reset_at_crash) {
+Model::Model(const std::string& fileName, double fail_prob, bool reset_at_crash, bool simplified_observation_space) {
     std::ifstream file(fileName);
     if (!file.is_open()) {
         std::cerr << "Failed to open file!" << std::endl;
@@ -83,6 +92,7 @@ Model::Model(const std::string& fileName, double fail_prob, bool reset_at_crash)
 
     this->fail_prob = fail_prob;
     this->reset_at_crash = reset_at_crash;
+    this->simplified_observation_space = simplified_observation_space;
 }
 
 double Model::getDistance(const ABS::Gamestate* a, const ABS::Gamestate* b) const {
@@ -150,8 +160,8 @@ void Model::calculate_goal_distances() {
 }
 
 
-double Model::heuristicsValue(ABS::Gamestate* state) const {
-    return - distances_to_goal.at({dynamic_cast<RT::Gamestate*>(state)->x, dynamic_cast<RT::Gamestate*>(state)->y});
+std::vector<double> Model::heuristicsValue(ABS::Gamestate* state) {
+    return {(double)- distances_to_goal.at({dynamic_cast<RT::Gamestate*>(state)->x, dynamic_cast<RT::Gamestate*>(state)->y})};
 }
 
 bool Gamestate::operator==(const ABS::Gamestate& other) const{
@@ -169,8 +179,8 @@ void Model::printState(ABS::Gamestate* state) {
     auto* rtState = dynamic_cast<RT::Gamestate*>(state);
     std::cout << "x: " << rtState->x << " y: " << rtState->y << " dx: " << rtState->dx << " dy: " << rtState->dy << std::endl;
     //print the obstalce map with car in it
-    for (size_t i = 0; i < obstacle_map[0].size(); i++) {
-        for (size_t j = 0; j < obstacle_map.size(); j++) {
+    for (int i = 0; i < (int)obstacle_map[0].size(); i++) {
+        for (int j = 0; j < (int)obstacle_map.size(); j++) {
             if (obstacle_map[j][i])
                 std::cout << "x";
             else if (goal_map[j][i])

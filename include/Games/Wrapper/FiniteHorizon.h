@@ -55,8 +55,14 @@ namespace FINITEH
            return original_model->getMinV(remaining_steps);
         }
 
+        [[nodiscard]] std::vector<double> heuristicsValue(ABS::Gamestate* uncasted_state) override {
+           return original_model->heuristicsValue(dynamic_cast<Gamestate*>(uncasted_state)->ground_state);
+        }
+
         [[nodiscard]] std::vector<int> obsShape() const override {
-            return original_model->obsShape();
+            auto shape =  original_model->obsShape();
+            shape[0]++;
+            return shape;
         }
 
         [[nodiscard]] std::vector<int> actionShape() const override {
@@ -65,10 +71,19 @@ namespace FINITEH
 
         void getObs(ABS::Gamestate* uncasted_state, int* obs) override {
             original_model->getObs(dynamic_cast<Gamestate*>(uncasted_state)->ground_state, obs);
+            int start_idx = 1;
+            int end_idx = 1;
+            auto shape = obsShape();
+            for (int i = 0; i < (int)shape.size(); i++) {
+                start_idx *= i == 0? (shape[i]-1) : shape[i];
+                end_idx *= shape[i];
+            }
+            for (int i = start_idx; i < end_idx; i++)
+                obs[i] = dynamic_cast<Gamestate*>(uncasted_state)->remaining_steps;
         }
 
-        [[nodiscard]] int encodeAction(ABS::Gamestate* state, int* decoded_action, bool* valid) override {
-            return original_model->encodeAction(dynamic_cast<Gamestate*>(state)->ground_state, decoded_action, valid);
+        [[nodiscard]] int encodeAction(int* decoded_action) override {
+            return original_model->encodeAction(decoded_action);
         }
 
     private:

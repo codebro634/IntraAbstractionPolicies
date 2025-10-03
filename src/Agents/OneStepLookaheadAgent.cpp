@@ -20,6 +20,9 @@ int OneStepLookaheadAgent::getAction(ABS::Model* model, ABS::Gamestate* gamestat
         //Apply the action to the copied state
         auto [rewards, prob] = model->applyAction(copy, action, rng);
 
+        //To avoid memory leaks, close copy
+        delete copy;
+
         //Trick to efficiently break ties
         rewards[player] += 1e-6 * std::uniform_real_distribution<double>(0, 1.0)(rng);
 

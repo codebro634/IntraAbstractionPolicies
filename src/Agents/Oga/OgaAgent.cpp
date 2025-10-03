@@ -10,10 +10,14 @@
 #include <cmath>
 #include <chrono>
 #include <utility>
+#include <cstring>
 
 #include "../../../include/Utils/Distributions.h"
 
 using namespace OGA;
+
+OgaAgent::~OgaAgent(){
+}
 
 OgaAgent::OgaAgent(const OgaArgs& args) :
     exploration_parameter(args.exploration_parameter),
@@ -26,7 +30,8 @@ OgaAgent::OgaAgent(const OgaArgs& args) :
     in_abs_policy(args.in_abs_policy),
     track_statistics(args.track_statistics),
     Q_map(args.Q_map),
-    distribution_agent(args.distribution_agent){
+    distribution_agent(args.distribution_agent)
+{
     assert (args.exploration_parameter >= 0);
 }
 
@@ -35,14 +40,16 @@ int OgaAgent::getAction(ABS::Model* model, ABS::Gamestate* state, std::mt19937& 
 }
 
 int OgaAgent::getAction(ABS::Model* model, ABS::Gamestate* state, std::mt19937& rng, OgaTree** treePtr){
+
     assert (dynamic_cast<FINITEH::Model*>(model) != nullptr && dynamic_cast<FINITEH::Gamestate*>(state) != nullptr);
 
     const auto start = std::chrono::high_resolution_clock::now();
 
-    OgaSearchStats search_stats = {budget, 0, 0,0,0,0,0};
+    OgaSearchStats search_stats = {budget, 0, 0,0,0,0,0,0,0,0,0};
     const auto total_forward_calls_before = model->getForwardCalls();
 
-    auto tree = new OgaTree{state, model, args.behavior_flags,rng}; // Empty tree
+    auto tree = new OgaTree{state, model, args.behavior_flags,rng, search_stats
+    };
 
     bool done = false;
     while (!done){
@@ -54,16 +61,24 @@ int OgaAgent::getAction(ABS::Model* model, ABS::Gamestate* state, std::mt19937& 
         search_stats.completed_iterations++;
         search_stats.total_forward_calls = model->getForwardCalls() - total_forward_calls_before;
 
+        double done_ratio = 0.0;
         if(budget.quantity == "iterations"){
             done = search_stats.completed_iterations >= budget.amount;
+            done_ratio = static_cast<double>(search_stats.completed_iterations) / budget.amount;
         } else if (budget.quantity == "forward_calls"){
             done = static_cast<int>(search_stats.total_forward_calls) >= budget.amount;
+            done_ratio = static_cast<double>(search_stats.total_forward_calls) / budget.amount;
         } else if (budget.quantity == "milliseconds"){
             done = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - start).count() >= budget.amount;
+            done_ratio = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - start).count() / budget.amount;
         }
     }
 
-    const int best_action = selectAction(tree->getRoot(), true, search_stats, rng);
+    const int best_action = selectAction(model, tree->getRoot(), true, search_stats, rng);
+
+    //Abstraction dropping statistics
+    if (track_statistics)
+        tree->updateStatistics(layerwise_statistics, global_statistics, Q_map, rng);
 
     if (treePtr != nullptr)
         *treePtr = tree;
@@ -84,11 +99,13 @@ OgaStateNode* OgaAgent::treePolicy(OgaTree* tree,  ABS::Model* model, OgaSearchS
             auto* state = curr_node->getStateCopy(model);
 
             const int action = curr_node->popUntriedAction();
-            auto [q_node, found_q] = tree->findOrCreateQState(state, curr_node->getDepth(), action, rng);
+            auto [q_node, found_q] = tree->findOrCreateQState(state, curr_node->getDepth(), action, rng, search_stats
+            );
             assert(!found_q);
 
             auto [rewards, prob] = model->applyAction(state, action, rng, nullptr);
-            auto [successor, found] = tree->findOrCreateState(state, curr_node->getDepth() + 1, rng);
+            auto [successor, found] = tree->findOrCreateState(state, curr_node->getDepth() + 1, rng, search_stats
+            );
 
             q_node->addChild(model->copyState(state), prob, successor);
             q_node->setRewards(rewards);
@@ -121,15 +138,17 @@ OgaStateNode* OgaAgent::treePolicy(OgaTree* tree,  ABS::Model* model, OgaSearchS
 OgaStateNode* OgaAgent::selectSuccessorState(OgaTree* tree, OgaStateNode* node, ABS::Model* model, OgaSearchStats& search_stats, std::mt19937& rng,
                                              bool* new_state)
 {
-    const int best_action = selectAction(node, false, search_stats, rng);
+    const int best_action = selectAction(model, node, false, search_stats, rng);
 
     const auto sample_state = node->getStateCopy(model);
-    auto [q_node, found_q] = tree->findOrCreateQState(sample_state, node->getDepth(), best_action, rng);
+    auto [q_node, found_q] = tree->findOrCreateQState(sample_state, node->getDepth(), best_action, rng, search_stats
+    );
     assert(found_q);
 
     // Sample successor of state-action-pair
     auto [rewards, prob] = model->applyAction(sample_state, best_action, rng, nullptr);
-    auto [successor, found] = tree->findOrCreateState(sample_state, node->getDepth() + 1, rng);
+    auto [successor, found] = tree->findOrCreateState(sample_state, node->getDepth() + 1, rng, search_stats
+    );
     *new_state = !found;
 
     auto state_cpy = model->copyState(sample_state);
@@ -144,7 +163,7 @@ OgaStateNode* OgaAgent::selectSuccessorState(OgaTree* tree, OgaStateNode* node, 
     return successor;
 }
 
-int OgaAgent::selectAction(const OgaStateNode* node, const bool greedy, OgaSearchStats& search_stats,std::mt19937& rng)
+int OgaAgent::selectAction(ABS::Model* model, OgaStateNode* node, const bool greedy, OgaSearchStats& search_stats,std::mt19937& rng)
 {
     // UCT Formula: w/n + c * sqrt(ln(N)/n)
     assert(node->isPartiallyExpanded());
@@ -173,7 +192,8 @@ int OgaAgent::selectAction(const OgaStateNode* node, const bool greedy, OgaSearc
 
 
         //Exploration term in uct formula
-        const double exploration_term = exploration_factor * sqrt(log(parent_node_visits) / action_visits);
+        double exploration_term = exploration_factor;
+        exploration_term *= sqrt(log(parent_node_visits) / action_visits);
 
         //Get final uct score
         double score = Q_value + exploration_term;
@@ -212,7 +232,8 @@ int OgaAgent::selectAction(const OgaStateNode* node, const bool greedy, OgaSearc
 
             double action_visits = child_q_node->getVisits();
             double Q_value = child_q_node->getValues() / action_visits;
-            const double exploration_term = exploration_factor * sqrt(log(parent_node_visits) / action_visits);
+            double exploration_term = exploration_factor;
+            exploration_term *= sqrt(log(parent_node_visits) / action_visits);
 
             double score;
             if (greedy || in_abs_policy == std::string("greedy"))
@@ -293,6 +314,13 @@ void OgaAgent::backup(OgaTree* tree, OgaStateNode* leaf, std::vector<double> val
 
         child_node = parent_q_node->getParent();
         child_node->addVisit();
+
+        if (args.behavior_flags.state_abs_alg == "random") {
+            child_node->addRecencyCount(); // Critical for OGA to not group stuff with terminal nodes is that the trajectory's final node's recency counter is not updated but only its parents
+            if (child_node->getRecencyCount() >= recency_count_limit)
+                tree->addUpdateStateNodeAbstraction(child_node);
+        } else if (args.behavior_flags.state_abs_alg != "asap")
+            throw std::runtime_error("[OgaAgent:backup] Unknown state abs alg: " + args.behavior_flags.state_abs_alg);
 
         //Dynamic exploration factor bookkeeping
         if (parent_q_node->getVisits() == 1)

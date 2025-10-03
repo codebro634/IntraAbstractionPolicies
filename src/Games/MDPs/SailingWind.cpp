@@ -45,14 +45,8 @@ void Model::getObs(ABS::Gamestate* uncasted_state, int* obs) {
     return {8};
 }
 
-int Model::encodeAction(ABS::Gamestate* state, int* decoded_action, bool* valid) {
-    auto* swState = dynamic_cast<SW::Gamestate*>(state);
-    int action = decoded_action[0];
-    auto wind_direction = getDirection(swState->wind_dir);
-    auto dir = getDirection(action);
-    *valid = inLake(swState->x + dir.first, swState->y + dir.second, ROWS, COLS) &&
-        (wind_direction.first != -dir.first || wind_direction.second != -dir.second);
-    return action;
+int Model::encodeAction(int* decoded_action) {
+    return decoded_action[0];
 }
 
 [[nodiscard]] std::string Gamestate::toString() const {
@@ -83,11 +77,11 @@ Model::Model(const bool deterministic) {
     wind_probs = deterministic ? DETERMINISTIC_WIND_PROBS : STOCHASTIC_WIND_PROBS;
 }
 
-double Model::heuristicsValue (ABS::Gamestate* state) const {
+std::vector<double> Model::heuristicsValue (ABS::Gamestate* state) {
     auto* swState = dynamic_cast<SW::Gamestate*>(state);
     int dx = std::abs(ROWS - swState->x -1);
     int dy = std::abs(COLS - swState->y -1);
-    return - (dx + dy);
+    return {(double) - (dx + dy)};
 }
 
 void Model::printState(ABS::Gamestate* state) {

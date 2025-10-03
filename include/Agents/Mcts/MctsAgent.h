@@ -44,10 +44,16 @@ namespace Mcts
         int rollout_length = -1;
         bool dag = false;
         bool dynamic_exploration_factor = false;
+        bool max_backup = false; //If true, use max backup instead of mean backup
 
         //For the paper "Monte Carlo Tree Search With Iteratively RefiningState Abstractions"
         bool wirsa = false;
         double a{},b{};
+
+        //For guessing good AlphaZero parameters
+        bool puct = false; //If true, use PUCT instead of UCT
+
+        bool greedy_decision_policy = true;
     };
 
     class MctsAgent final : public Agent
@@ -64,6 +70,7 @@ namespace Mcts
         int selectAction(MctsNode* node, bool greedy, std::mt19937& rng, MctsSearchStats& search_stats);
         std::vector<double> rollout(ABS::Model* model, MctsNode* node, std::mt19937& rng) const;
         void backup(std::vector<double> values, std::vector<std::tuple<MctsNode*,int,std::vector<double>>>& path, MctsSearchStats& search_stats) const;
+        int sampleAction(MctsNode* node,std::mt19937& rng);
 
         std::vector<double> exploration_parameters;
         double discount;
@@ -71,9 +78,12 @@ namespace Mcts
         int num_rollouts;
         bool dag;
         bool dynamic_exploration_factor;
+        bool max_backup;
         int rollout_length;
         bool wirsa;
         double a,b;
+        bool puct;
+        bool greedy_decision_policy;
         constexpr static double TIEBREAKER_NOISE = 1e-6;
     };
 

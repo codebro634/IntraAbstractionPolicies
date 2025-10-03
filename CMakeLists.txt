@@ -1,7 +1,9 @@
 cmake_minimum_required(VERSION 3.16.3)
-project(IntraAbs LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
+
+project(IntraAbs LANGUAGES CXX)
+
 set(CMAKE_CXX_FLAGS "-Wall -Wextra -Wpedantic -Wno-unused-parameter")
 
 set(SOURCE_FILES
@@ -18,6 +20,28 @@ set(SOURCE_FILES
         include/Arena.h
         include/Agents/HumanAgent.h
         src/Agents/HumanAgent.cpp
+        include/Games/TwoPlayerGames/TicTacToe.h
+        src/Games/TwoPlayerGames/TicTacToe.cpp
+        src/Games/TwoPlayerGames/Connect4.cpp
+        include/Games/TwoPlayerGames/Connect4.h
+        include/Games/TwoPlayerGames/Othello.h
+        src/Games/TwoPlayerGames/Othello.cpp
+        include/Games/TwoPlayerGames/Chess.h
+        src/Games/TwoPlayerGames/Chess.cpp
+        include/Games/TwoPlayerGames/Quarto.h
+        src/Games/TwoPlayerGames/Quarto.cpp
+        include/Games/TwoPlayerGames/Pylos.h
+        src/Games/TwoPlayerGames/Pylos.cpp
+        include/Games/TwoPlayerGames/NumbersRace.h
+        src/Games/TwoPlayerGames/NumbersRace.cpp
+        include/Games/TwoPlayerGames/Constrictor.h
+        src/Games/TwoPlayerGames/Constrictor.cpp
+        include/Games/TwoPlayerGames/KillTheKing.h
+        src/Games/TwoPlayerGames/KillTheKing.cpp
+        src/Games/TwoPlayerGames/CaptureTheFlag.cpp
+        src/Games/TwoPlayerGames/Pusher.cpp
+        include/Games/TwoPlayerGames/Pusher.h
+        include/Games/TwoPlayerGames/CaptureTheFlag.h
         include/Games/MDPs/GameOfLife.h
         src/Games/MDPs/GameOfLife.cpp
         src/Games/MDPs/Navigation.cpp
@@ -33,17 +57,34 @@ set(SOURCE_FILES
         src/Games/MDPs/RaceTrack.cpp
         include/Games/MDPs/AcademicAdvising.h
         src/Games/MDPs/AcademicAdvising.cpp
+        include/Games/MDPs/ToySoccer.h
+        src/Games/MDPs/ToySoccer.cpp
         include/Utils/Argparse.h
+        include/Games/MDPs/Elevators.h
+        src/Games/MDPs/Elevators.cpp
         include/Games/MDPs/Tamarisk.h
         src/Games/MDPs/Tamarisk.cpp
         include/Games/MDPs/CrossingTraffic.h
         src/Games/MDPs/CrossingTraffic.cpp
+        include/Games/MDPs/Saving.h
+        src/Games/MDPs/Saving.cpp
+        include/Games/MDPs/FixedActionSpaceEnv.h
+        src/Games/MDPs/FixedActionSpaceEnv.cpp
+        include/Games/MDPs/GraphTraversal.h
+        src/Games/MDPs/GraphTraversal.cpp
+        include/Agents/SparseSamplingAgent.h
+        src/Agents/SparseSamplingAgent.cpp
         include/Utils/Distributions.h
         src/Utils/Distributions.cpp
         include/Utils/ValueIteration.h
         src/Utils/ValueIteration.cpp
-        include/Agents/LookupTableAgent.h
-        src/Agents/LookupTableAgent.cpp
+        include/Games/MDPs/GraphTraversal.h
+        src/Agents/Oga/TestOga.cpp
+        src/Games/MDPs/GraphTraversal.cpp
+        include/Games/MDPs/Wildfire.h
+        src/Games/MDPs/Wildfire.cpp
+        include/Games/MDPs/MultiArmedBandit.h
+        src/Games/MDPs/MultiArmedBandit.cpp
         include/Games/MDPs/CooperativeRecon.h
         src/Games/MDPs/CooperativeRecon.cpp
         include/Games/MDPs/Traffic.h
@@ -54,8 +95,16 @@ set(SOURCE_FILES
         src/Games/MDPs/TriangleTireworld.cpp
         include/Games/MDPs/EarthObservation.h
         src/Games/MDPs/EarthObservation.cpp
+        include/Games/MDPs/PushYourLuck.h
+        src/Games/MDPs/PushYourLuck.cpp
+        include/Games/MDPs/RedFinnedBlueEye.h
+        src/Games/MDPs/RedFinnedBlueEye.cpp
+        include/Games/MDPs/WildlifePreserve.h
+        src/Games/MDPs/WildlifePreserve.cpp
         src/Games/MDPs/Manufacturer.cpp
         include/Games/MDPs/Manufacturer.h
+        include/Games/Wrapper/MultiPlayerToMDP.h
+        src/Games/Wrapper/MultiPlayerToMDP.cpp
         include/Games/Wrapper/FiniteHorizon.h
         src/Games/Wrapper/FiniteHorizon.cpp
         include/Agents/Oga/OgaAbstractNodes.h
@@ -66,19 +115,58 @@ set(SOURCE_FILES
         src/Agents/Oga/OgaGroundNodes.cpp
         src/Agents/Oga/OgaAbstractNodes.cpp
         src/Agents/Oga/OgaUtils.cpp
-        include/Utils/MiscAnalysis.h
-        src/Utils/MiscAnalysis.cpp
+        include/Games/MDPs/JoinFive.h
+        src/Games/MDPs/JoinFive.cpp
+        include/Games/TwoPlayerGames/WinLossGames.h
+        src/Games/TwoPlayerGames/WinLossGames.cpp
         include/Utils/MemoryAnalysis.h
         src/Utils/MemoryAnalysis.cpp
-        include/Agents/OneStepLookahead.h
-        src/Agents/OneStepLookaheadAgent.cpp
+        src/demo.cpp
+        src/Utils/CLink.cpp
         include/Utils/ModelMaker.h
         src/Utils/ModelMaker.cpp
         include/Utils/AgentMaker.h
         src/Utils/AgentMaker.cpp
         include/Games/Wrapper/RandomStart.h
         src/Games/Wrapper/RandomStart.cpp
+        include/Games/Wrapper/Determinization.h
+        src/Games/Wrapper/Determinization.cpp
+        include/Games/Wrapper/HeuristicsAsReward.h
+        src/Games/Wrapper/HeuristicsAsReward.cpp
+        include/Games/MDPs/BinPacking.h
+        src/Games/MDPs/BinPacking.cpp
+        include/Games/MDPs/Knapsack.h
+        src/Games/MDPs/Knapsack.cpp
+        include/Games/MDPs/TravellingSalesPerson.h
+        src/Games/MDPs/TravellingSalesPerson.cpp
+        include/Games/MDPs/SupplyChain.h
+        src/Games/MDPs/SupplyChain.cpp
+        include/Games/Wrapper/ScriptedStart.h
+        src/Games/Wrapper/ScriptedStart.cpp
+        src/Agents/OneStepLookaheadAgent.cpp
+        include/Agents/OneStepLookahead.h
 )
+
+#Shared lib
+add_library(liblink SHARED ${SOURCE_FILES})
+target_compile_options(liblink PRIVATE
+        -Wall
+        -fPIC
+        -O3
+)
+
+if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    # For MinGW / GCC
+    target_link_options(liblink PRIVATE
+            $<$<STREQUAL:${CMAKE_SYSTEM_NAME},Windows>:-static>
+            $<$<STREQUAL:${CMAKE_SYSTEM_NAME},Windows>:-static-libgcc>
+            $<$<STREQUAL:${CMAKE_SYSTEM_NAME},Windows>:-static-libstdc++>
+    )
+    message(STATUS "Using GCC/MinGW compiler")
+else()
+    message(FATAL_ERROR "Compiler '${CMAKE_CXX_COMPILER_ID}' is not supported by this build.")
+endif()
+set_target_properties(liblink PROPERTIES OUTPUT_NAME "liblink")
 
 #Debug executable
 add_executable(IntraAbsDebug ${SOURCE_FILES})

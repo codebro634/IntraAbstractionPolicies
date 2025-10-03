@@ -7,8 +7,8 @@
 #include <vector>
 #include <iostream>
 #include <random>
-#include <stack>
 #include <unordered_map>
+#include <map>
 
 namespace ABS
 {
@@ -18,22 +18,22 @@ namespace ABS
         bool terminal=false;
         virtual ~Gamestate() = default;
 
-        [[nodiscard]] virtual std::string toString() const {
+        [[nodiscard]] virtual std::string toString() const { //optional
             return std::string("(") + std::to_string(turn) + std::string(",") + std::to_string(terminal) + std::string(")");
         }
 
-        friend std::ostream& operator<<(std::ostream& os, const Gamestate& state) {
+        friend std::ostream& operator<<(std::ostream& os, const Gamestate& state) { //optional
             // Dynamically execute the function that converts the state to a string
             os << state.toString();
             return os;
         }
 
         // Functions for hashing and comparison needed for unordered_map and unordered_set
-        virtual bool operator==(const Gamestate& other) const
+        virtual bool operator==(const Gamestate& other) const // required
         {
             throw std::runtime_error("Equality not implemented");
         }
-        [[nodiscard]] virtual size_t hash() const
+        [[nodiscard]] virtual size_t hash() const //required
         {
             throw std::runtime_error("Hash not implemented");
         }
@@ -47,20 +47,22 @@ namespace ABS
     class Model {
 
         protected:
-            virtual std::pair<std::vector<double>,double> applyAction_(Gamestate* uncasted_state, int action, std::mt19937& rng, std::vector<std::pair<int,int>>* decision_outcomes)=0;
-            virtual std::vector<int> getActions_(Gamestate* uncasted_state)=0;
+            virtual std::pair<std::vector<double>,double> applyAction_(Gamestate* uncasted_state, int action, std::mt19937& rng, std::vector<std::pair<int,int>>* decision_outcomes)=0; //required
+            virtual std::vector<int> getActions_(Gamestate* uncasted_state)=0; //required
             long total_forward_calls = 0;
+
+            std::map<int,std::vector<int>> action_encoding_map;
 
         public:
             virtual ~Model() = default;
-            virtual void printState(Gamestate* uncasted_state)=0;
+            virtual void printState(Gamestate* uncasted_state)=0; //required
 
-            virtual Gamestate* getInitialState(std::mt19937& rng)=0; //Random init state
+            virtual Gamestate* getInitialState(std::mt19937& rng)=0; //Random init state, required
             virtual Gamestate* getInitialState(int num){ throw std::runtime_error("Deterministic initial state not implemented.");} //Deterministic init state
-            virtual int getNumPlayers()=0;
-            virtual bool hasTransitionProbs()=0;
+            virtual int getNumPlayers()=0; //Required
+            virtual bool hasTransitionProbs()=0; //Required
 
-            virtual Gamestate* copyState(Gamestate* uncasted_state)=0;
+            virtual Gamestate* copyState(Gamestate* uncasted_state)=0; //Required
 
             virtual std::vector<int> getActions(Gamestate* uncasted_state) final {
                 assert (!uncasted_state->terminal); //state must not be terminal
@@ -69,7 +71,7 @@ namespace ABS
 
             //Assertions:
             //1. Reward depends only on the state and action and NOT the sampled successor, i.e. R(s,a)
-            virtual std::pair<std::vector<double>,double> applyAction(Gamestate* uncasted_state, int action, std::mt19937& rng, std::vector<std::pair<int,int>>* decision_outcomes = nullptr) final {
+            virtual std::pair<std::vector<double>,double> applyAction(Gamestate* uncasted_state, int action, std::mt19937& rng, std::vector<std::pair<int,int>>* decision_outcomes = nullptr) final { //Required
                 assert (!uncasted_state->terminal); //state must not be terminal
                 total_forward_calls++;
                 auto result = applyAction_(uncasted_state, action, rng, decision_outcomes);
@@ -117,46 +119,100 @@ namespace ABS
                 return {outcomes,psum};
             }
 
+            std::vector<int> idx_to_multi_discrete(int idx){
+                    auto multi = std::vector<int>();
+                    for (int dim = 0; dim < (int)actionShape().size(); dim++) {
+                        multi.push_back(idx % actionShape()[dim]);
+                        idx /= actionShape()[dim];
+                    }
+                    return multi;
+                }
+
+            int multi_discrete_to_idx(std::vector<int> multi_discrete) {
+                    int idx = 0;
+                    for (int i = 0; i < (int) multi_discrete.size(); i++) {
+                        int prod = 1;
+                        for (int j = 0; j < i; j++)
+                            prod *= actionShape()[j];
+                        idx += multi_discrete[i] * prod;
+                    }
+                    return idx;
+                }
+
             virtual long getForwardCalls() {
                 return total_forward_calls;
             };
 
             //For potential ML applications
-            [[nodiscard]] virtual std::vector<int> obsShape() const {
+            [[nodiscard]] virtual std::vector<int> obsShape() const { //optional [wär aber nett]
                 throw std::runtime_error("Observation Shape not implemented."); //Assuming obs can always be represented as a multi-dim box
             }
 
-            virtual void getObs(ABS::Gamestate* uncasted_state, int* obs) {
+            virtual void getObs(ABS::Gamestate* uncasted_state, int* obs) { //optional [wär aber nett]
                 throw std::runtime_error("Observation not implemented.");
             }
 
-            [[nodiscard]] virtual std::vector<int> actionShape() const {
+            [[nodiscard]] virtual std::vector<int> actionShape() const { //optional [wär aber nett]
                 throw std::runtime_error("Action Shape not implemented."); //Assuming theres always a multi-discrete action space
             }
 
-            [[nodiscard]] virtual int encodeAction(ABS::Gamestate* state, int* decoded_action, bool* valid) { //to bring the action in the correct format to be used for applyAction. Valid is set to false, if the action is not legal in the given state.
+            [[nodiscard]] virtual int encodeAction(int* decoded_action) { //optional [wär aber nett]. This is to bring the action in the correct format to be used for applyAction. Valid is set to false, if the action is not legal in the given state.
                 throw std::runtime_error("Action encoding not implemented.");
             }
 
+            [[nodiscard]] virtual std::vector<int> decodeAction(int action) {
+                auto iterator = action_encoding_map.find(action);
+                if (iterator != action_encoding_map.end()) {
+                    return iterator->second;
+                } else {
+                    //iterate over entire actionspace
+                    auto ashape = actionShape();
+                    auto aitr = new int[ashape.size()];
+                    int max_actions = 1;
+                    for (int i = 0; i < (int)ashape.size(); i++) {
+                        aitr[i] = 0;
+                        max_actions *= ashape[i];
+                    }
+
+                    for (int i = 0; i < max_actions; i++) {
+                        if (encodeAction(aitr) == action) {
+                            std::vector<int> result(aitr, aitr + ashape.size());
+                            action_encoding_map[action] = result;
+                            delete[] aitr;
+                            return result;
+                        }
+                        //advance iterator
+                        for (int j = (int)ashape.size()-1; j >= 0; j--){
+                            aitr[j]++;
+                            if (aitr[j] < ashape[j])
+                                break;
+                            else
+                                aitr[j] = 0;
+                        }
+                    }
+                }
+                throw std::runtime_error("Couldnt decode action " + std::to_string(action));
+            }
+
             //Functions for algorithms that need a heuristic value of the state
-            [[nodiscard]] virtual double heuristicsValue(Gamestate* uncasted_state) const {
+            [[nodiscard]] virtual std::vector<double> heuristicsValue(Gamestate* uncasted_state) { //optional
                 throw std::runtime_error("Heuristics not implemented.");
             }
 
-            [[nodiscard]] virtual double getMaxV(int remaining_steps) const {
+            [[nodiscard]] virtual double getMaxV(int remaining_steps) const { //optional
                 throw std::runtime_error("MaxV not implemented.");
             }
 
-            [[nodiscard]] virtual double getMinV(int remaining_steps) const {
+            [[nodiscard]] virtual double getMinV(int remaining_steps) const { //optional
                 throw std::runtime_error("MinV not implemented.");
             }
 
-            [[nodiscard]] virtual double getDistance(const Gamestate* a, const Gamestate* b) const {
+            [[nodiscard]] virtual double getDistance(const Gamestate* a, const Gamestate* b) const { //optional
                 throw std::runtime_error("Distance not implemented.");
             }
 
             //Deserialization
-            [[nodiscard]] virtual ABS::Gamestate* deserialize(std::string& ostring) const {
+            [[nodiscard]] virtual ABS::Gamestate* deserialize(std::string& ostring) const { //optional
                 throw std::runtime_error("Deserialization not implemented.");
             }
 

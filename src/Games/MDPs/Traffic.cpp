@@ -9,7 +9,7 @@ namespace TR
 
     void TrafficModel::getObs(ABS::Gamestate* uncasted_state, int* obs) {
         auto state = dynamic_cast<TrafficState*>(uncasted_state);
-        assert (numCells == state->occupiedCells.size());
+        assert (numCells == (int)state->occupiedCells.size());
         for (int i = 0; i < numCells; i++)
             obs[i] = state->occupiedCells[i] ? 1 : 0;
         for (int i = 0; i < numIntersections; i++){
@@ -25,7 +25,7 @@ namespace TR
         return shape;
     }
 
-    int TrafficModel::encodeAction(ABS::Gamestate* state, int* decoded_action, bool* valid) {
+    int TrafficModel::encodeAction(int* decoded_action) {
         int pow = 1;
         int action = 0;
         for (int i = 0; i < numIntersections; i++){

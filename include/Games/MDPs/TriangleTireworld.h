@@ -33,13 +33,15 @@ namespace TRT {
         int init_pos;
         std::vector<int> init_spare;
 
+        bool big_payoff;
+
     protected:
 
         std::pair<std::vector<double>,double> applyAction_(ABS::Gamestate* uncasted_state, int action, std::mt19937& rng, std::vector<std::pair<int,int>>* decision_outcomes) override;
         std::vector<int> getActions_(ABS::Gamestate* uncasted_state) override;
 
     public:
-        explicit Model(const std::string& filePath, bool idle_action, bool reduced_action_space);
+        explicit Model(const std::string& filePath, bool idle_action, bool reduced_action_space, bool big_payoff);
         ~Model() override = default;
         void printState(ABS::Gamestate* uncasted_state) override;
         ABS::Gamestate* getInitialState(std::mt19937& rng) override;
@@ -50,7 +52,7 @@ namespace TRT {
         [[nodiscard]] std::vector<int> obsShape() const override;
         void getObs(ABS::Gamestate* uncasted_state, int* obs) override;
         [[nodiscard]] std::vector<int> actionShape() const override;
-        [[nodiscard]] int encodeAction(ABS::Gamestate* state, int* decoded_action, bool* valid) override;
+        [[nodiscard]] int encodeAction(int* decoded_action) override;
     };
 
 } // namespace ABS

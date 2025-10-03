@@ -262,7 +262,7 @@ ABS::Gamestate* Model::copyState(ABS::Gamestate* uncasted_state){
     return sNew;
 }
 
-void decodeAction(int unsigned_action, int num_goods,
+void unpackAction(int unsigned_action, int num_goods,
     std::vector<std::vector<int>>& purchases,
     std::vector<std::vector<int>>& produces,
     std::vector<std::vector<int>>& purchase_produce,
@@ -460,7 +460,7 @@ std::vector<int> Model::getActions_(ABS::Gamestate* uncasted_state){
     //     int hired_prod_managers;
     //     bool hire_lobbyist;
     //     bool hire_marketing_manager;
-    //     decodeAction(action, num_goods,purchases, produces, purchase_produce, purchase_produce_sell_bool, produce_for_sale, produce_for_sale_bool, purchase_produce_sell, sell, building, hired_prod_managers, hire_lobbyist, hire_marketing_manager);
+    //     unpackAction(action, num_goods,purchases, produces, purchase_produce, purchase_produce_sell_bool, produce_for_sale, produce_for_sale_bool, purchase_produce_sell, sell, building, hired_prod_managers, hire_lobbyist, hire_marketing_manager);
     //     //print
     //     std::cout << "----------------" << std::endl;
     //     std::cout << action << std::endl;
@@ -513,7 +513,7 @@ std::pair<std::vector<double>,double> Model::applyAction_(ABS::Gamestate* uncast
     int hired_prod_managers;
     bool hire_lobbyist;
     bool hire_marketing_manager;
-    decodeAction(action, num_goods,purchases, produces, purchase_produce, purchase_produce_sell_bool, produce_for_sale, produce_for_sale_bool, purchase_produce_sell, sell, building, hired_prod_managers, hire_lobbyist, hire_marketing_manager);
+    unpackAction(action, num_goods,purchases, produces, purchase_produce, purchase_produce_sell_bool, produce_for_sale, produce_for_sale_bool, purchase_produce_sell, sell, building, hired_prod_managers, hire_lobbyist, hire_marketing_manager);
 
     double outcomeProb = 1.0;
 

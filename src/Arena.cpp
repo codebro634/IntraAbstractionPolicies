@@ -11,6 +11,8 @@
 #include <queue>
 #include "../include/Utils/Distributions.h"
 #include "../include/Games/Wrapper/FiniteHorizon.h"
+#include <fstream>
+
 
 static double DEFAULT_CONFIDENCE = 0.99;
 
@@ -18,6 +20,7 @@ void outputStats(OutputMode& output_mode,
                  std::vector<std::pair<double,double>>& results,
                  std::vector<double>& regrets,
                  std::vector<double>& highest_rewards,
+                 std::vector<double>& lowest_rewards,
                  std::vector<std::pair<int,int>>& num_optimal_actions,
                  int games_played,
                  std::vector<int>& permutation,
@@ -45,14 +48,15 @@ void outputStats(OutputMode& output_mode,
             //Last game reward
             std::cout << "Player " << j << " last game reward: " << reward_sum[j] << std::endl;
 
-            //Best reward
+            //Best and worst reward
             std::cout << "Player " << j << " highest reward: " << highest_rewards[j] << std::endl;
+            std::cout << "Player " << j << " lowest reward: " << lowest_rewards[j] << std::endl;
 
             //Confidence interval for times
             conf_range = distr::confidence_interval(times[j].first, times[j].second, num_actions[j], DEFAULT_CONFIDENCE, 2).second - times[j].first / num_actions[j];
             std::cout << "Player " << j << " avg time: " << times[j].first/num_actions[j] << " +- " << conf_range <<  std::endl;
 
-            std::cout << "Player " << j << " played actions: ";
+            std::cout << "Player " << j << " played " << played_actions[j].size() << " actions: ";
             for (size_t action_idx = 0; action_idx < played_actions[j].size(); action_idx++)
                 std::cout << played_actions[j][action_idx] << " ";
             std::cout << std::endl;
@@ -64,7 +68,7 @@ void outputStats(OutputMode& output_mode,
 
     }
 
-    if (output_mode == CSV)
+    if (output_mode == CSV || output_mode == CSV_OMIT_TIMES)
     {
         // Episode Nr.
         std::cout << games_played << ";";
@@ -91,17 +95,20 @@ void outputStats(OutputMode& output_mode,
             {
                 std::cout << played_action << " ";
             }
-            std::cout << ";";
 
-            double sum_times = 0;
-            for (const auto& individual_time : individual_times[j])
-            {
-                std::cout << individual_time << " ";
-                sum_times += individual_time;
+            if (output_mode != CSV_OMIT_TIMES){
+                std::cout << ";";
+
+                double sum_times = 0;
+                for (const auto& individual_time : individual_times[j])
+                {
+                    std::cout << individual_time << " ";
+                    sum_times += individual_time;
+                }
+                std::cout << ";";
+
+                std::cout << sum_times;
             }
-            std::cout << ";";
-
-            std::cout << sum_times;
 
             if (j != results.size() - 1)
             {
@@ -113,7 +120,7 @@ void outputStats(OutputMode& output_mode,
     }
 }
 
-void outputCsvHeader(int players)
+void outputCsvHeader(int players, bool omit_times)
 {
     // Header for Episode Number
     std::cout << "Episode Nr;";
@@ -130,13 +137,15 @@ void outputCsvHeader(int players)
         std::cout << "Regrets Player " << j << ";";
 
         // Played Actions for each player
-        std::cout << "Actions Player " << j << ";";
+        std::cout << "Actions Player " << j;
 
-        // Individual Times for each player
-        std::cout << "Times Player " << j << ";";
+        if (!omit_times){
+            // Individual Times for each player
+            std::cout << ";Times Player " << j << ";";
 
-        // Sum of Times for each player
-        std::cout << "Total Time Player " << j;
+            // Sum of Times for each player
+            std::cout << "Total Time Player " << j;
+        }
 
         // Separate players by semicolons
         if (j != players-1) {
@@ -149,7 +158,7 @@ void outputCsvHeader(int players)
 }
 
 std::vector<std::vector<double>> playGames(
-    ABS::Model& unwrapped_model,
+    ABS::Model* unwrapped_model,
     int num_maps,
     std::vector<Agent*> agents,
     std::mt19937& rng,
@@ -158,10 +167,12 @@ std::vector<std::vector<double>> playGames(
     bool planning_beyond_execution_horizon,
     bool random_init_state,
     double required_conf_range,
-    std::unordered_map<std::pair<FINITEH::Gamestate*,int>, double, VALUE_IT::QMapHash, VALUE_IT::QMapCompare>* Q_map)
+    std::unordered_map<std::pair<FINITEH::Gamestate*,int>, double, VALUE_IT::QMapHash, VALUE_IT::QMapCompare>* Q_map,
+    const std::string& rng_save_path,
+    int episode_num_offset)
 {
 
-    auto model = FINITEH::Model(&unwrapped_model, horizons.first, false);
+    auto model = FINITEH::Model(unwrapped_model, horizons.first, false);
 
     std::vector<std::pair<double,double>> results = std::vector<std::pair<double,double>>(model.getNumPlayers(), {0,0}); //cumulative reward, and cumulative squared reward
     std::vector<double> regrets = std::vector<double>(model.getNumPlayers(), 0);
@@ -169,19 +180,32 @@ std::vector<std::vector<double>> playGames(
     std::vector<unsigned> num_actions = std::vector<unsigned>(model.getNumPlayers(), 0);
     std::vector<std::pair<int,int>> num_optimal_action_chosen = std::vector<std::pair<int,int>>(model.getNumPlayers(), {0,0});
     std::vector<double> highest_rewards = std::vector<double>(model.getNumPlayers(), std::numeric_limits<double>::lowest());
+    std::vector<double> lowest_rewards = std::vector<double>(model.getNumPlayers(), std::numeric_limits<double>::max());
 
     assert (static_cast<int>(agents.size()) == model.getNumPlayers() && horizons.first >= horizons.second);
 
-    if (output_mode == CSV)
-        outputCsvHeader(model.getNumPlayers());
+    if ((output_mode == CSV || output_mode == CSV_OMIT_TIMES) && episode_num_offset == 0)
+        outputCsvHeader(model.getNumPlayers(),output_mode == CSV_OMIT_TIMES);
 
-    int games_played = 0;
+    int games_played = episode_num_offset;
     int num_perms = 1;
     for (size_t i = 2; i <= agents.size(); i++)
         num_perms *= i;
 
     double performance_confidence_interval_length = 0;
-    for (int i = 0; i < num_maps || performance_confidence_interval_length > required_conf_range; i++) {
+    for (int i = episode_num_offset; i < num_maps || performance_confidence_interval_length > required_conf_range; i++) {
+
+        //if specified, save the rng state before each game
+        if (!rng_save_path.empty() ){
+            std::ofstream out(rng_save_path);
+            if (out) {
+                out << rng;
+            } else {
+                std::cerr << "Failed to open file for saving the RNG state.\n";
+                exit(42);
+            }
+            out.close();
+        }
 
         //iterate through all possible agent assignments
         std::vector<int> permutation(agents.size());
@@ -263,11 +287,12 @@ std::vector<std::vector<double>> playGames(
                 results[k].first += reward_sum[permutation[k]];
                 results[k].second += reward_sum[permutation[k]] * reward_sum[permutation[k]];
                 highest_rewards[k] = std::max(highest_rewards[k], reward_sum[permutation[k]]);
+                lowest_rewards[k] = std::min(lowest_rewards[k], reward_sum[permutation[k]]);
                 for(double r : regrets_last_game[permutation[k]])
                     regrets[k] += r;
             }
 
-            outputStats(output_mode, results, regrets, highest_rewards, num_optimal_action_chosen, games_played, permutation, played_actions, individual_times, reward_sum, num_actions, regrets_last_game, times);
+            outputStats(output_mode, results, regrets, highest_rewards, lowest_rewards, num_optimal_action_chosen, games_played, permutation, played_actions, individual_times, reward_sum, num_actions, regrets_last_game, times);
 
             delete gamestate;
         } while(std::next_permutation(permutation.begin(), permutation.end()));

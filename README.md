@@ -6,20 +6,19 @@ abstraction algorithms" which contains the code to reproduce the experiments and
 
 ## Abstract
 
-One method of improving Monte Carlo Tree Search
-(MCTS) is to build and use state and/or action abstractions in
-parallel to the tree search. The primary usage of abstractions for
-MCTS is to enhance the UCB value during the tree policy by
-aggregating visits and returns of an abstract node. However, this
-direct usage of abstractions does not take the case into account
-where multiple actions with the same parent might be in the
-same abstract node, as these would then all have the UCB value,
-thus requiring a tiebreak rule. In state-of-the-art abstraction
-algorithms such as OGA-UCT, this case has not been noticed
-and a random tiebreak rule was implicitly chosen. In this paper,
-we propose and empirically evaluate several alternative intra-
-abstraction policies, several of which outperform the random
-policy across a majority of environments and parameter settings.
+One weakness of Monte Carlo Tree Search (MCTS) is its sample efficiency which
+can be addressed by building and using state and/or action abstractions in parallel
+to the tree search such that information can be shared among nodes of the same
+layer. The primary usage of abstractions for MCTS is to enhance the Upper Confidence
+Bound (UCB) value during the tree policy by aggregating visits and returns
+of an abstract node. However, this direct usage of abstractions does not take the
+case into account where multiple actions with the same parent might be in the
+same abstract node, as these would then all have the same UCB value, thus requiring
+a tiebreak rule. In state-of-the-art abstraction algorithms such as pruned On
+the Go Abstractions (pruned OGA), this case has not been noticed, and a random
+tiebreak rule was implicitly chosen. In this paper, we propose and empirically
+evaluate several alternative intra-abstraction policies, several of which outperform
+the random policy across a majority of environments and parameter settings.
 
 ## Installation
 

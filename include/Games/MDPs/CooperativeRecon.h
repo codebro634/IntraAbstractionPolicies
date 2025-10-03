@@ -65,14 +65,14 @@ namespace RECON
         [[nodiscard]] std::vector<int> obsShape() const override;
         void getObs(ABS::Gamestate* uncasted_state, int* obs) override;
         [[nodiscard]] std::vector<int> actionShape() const override;
-        [[nodiscard]] int encodeAction(ABS::Gamestate* state, int* decoded_action, bool* valid) override;
+        [[nodiscard]] int encodeAction(int* decoded_action) override;
 
     protected:
         std::pair<std::vector<double>,double> applyAction_(Gamestate* state, int action, std::mt19937& rng, std::vector<std::pair<int,int>>* decision_outcomes) override;
         std::vector<int> getActions_(Gamestate* state) override;
 
     private:
-        void decodeAction(int action,bool& usedCamera, bool& usedLife, bool& usedWater,int& objIndex) const;
+        void actionToTools(int action, int x, int y, bool& usedCamera, bool& usedLife, bool& usedWater,int& objIndex) const;
 
     };
 }

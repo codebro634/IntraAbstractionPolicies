@@ -53,24 +53,8 @@ namespace RECON
             return {5 + NUM_TOOLS*2};
     }
 
-    int ReconModel::encodeAction(ABS::Gamestate* state, int* decoded_action, bool* valid) {
-        auto st = dynamic_cast<ReconState*>(state);
-
-        int action = *decoded_action-1;
-
-        if (action >= 4 && action <= 6 && !base_[st->agent_y * gridW_ + st->agent_x])
-            *valid = false;
-        if (action > 6 && objects[st->agent_y * gridW_ + st->agent_x] != -1)
-            *valid = false;
-
-        if (action > 6){
-            int diff = action - 7;
-            int obj = objects[st->agent_y * gridW_ + st->agent_x];
-            *valid = (obj != -1);
-            action = 7 + (diff * objectPositions_.size()) + obj % objectPositions_.size();
-        }
-
-        return action;
+    int ReconModel::encodeAction(int* decoded_action) {
+        return decoded_action[0]-1;
     }
 
     bool ReconState::operator==(const Gamestate& other) const
@@ -293,29 +277,17 @@ namespace RECON
             actions.push_back(6); // repair water
         }
 
-        // If the agent is standing on the same cell as an object, we can use tools
-        for(size_t i=0; i<objectPositions_.size(); i++){
-            auto [ox, oy] = objectPositions_[i];
-            if(ox == st->agent_x && oy == st->agent_y){
-                // use camera on object i
-                int cameraAct = 7 + (0 * objectPositions_.size()) + i;
-                actions.push_back(cameraAct);
-
-                // use life on object i
-                int lifeAct   = 7 + (1 * objectPositions_.size()) + i;
-                actions.push_back(lifeAct);
-
-                // use water on object i
-                int waterAct  = 7 + (2 * objectPositions_.size()) + i;
-                actions.push_back(waterAct);
-            }
+        if (objects[st->agent_y * gridW_ + st->agent_x] != -1) {
+            actions.push_back(7); //use camera
+            actions.push_back(8); //use life
+            actions.push_back(9); //use water
         }
 
         return actions;
     }
 
     // Helper to decode an action integer
-    void ReconModel::decodeAction(int action,
+    void ReconModel::actionToTools(int action, int x, int y,
                                            bool& usedCamera, bool& usedLife, bool& usedWater,
                                            int& objIndex) const
     {
@@ -329,17 +301,14 @@ namespace RECON
             return;
         }
         // Otherwise, it's "use tool on object"
-        int shifted  = action - 7;
-        int toolIdx  = shifted / objectPositions_.size();
-        int objectId = shifted % objectPositions_.size();
-
+        int toolIdx  = action - 7;
         switch(toolIdx) {
             case 0: usedCamera = true; break;
             case 1: usedLife   = true; break;
             case 2: usedWater  = true; break;
             default: /* unexpected */  break;
         }
-        objIndex = objectId;
+        objIndex = objects[y * gridW_ + x];
     }
 
     std::pair<std::vector<double>, double>
@@ -356,7 +325,7 @@ namespace RECON
         // If the action is "use camera on object i", we check the domain's formula
         bool usedCamera, usedLife, usedWater;
         int  usedObj = -1;
-        decodeAction(action, usedCamera, usedLife, usedWater, usedObj);
+        actionToTools(action,st->agent_x,st->agent_y, usedCamera, usedLife, usedWater, usedObj);
 
         if(usedCamera && usedObj >= 0) {
             bool lifeDet   = ost.lifeDetected[usedObj];

@@ -26,15 +26,11 @@ void Model::getObs(ABS::Gamestate* uncasted_state, int* obs) {
 }
 
 [[nodiscard]] std::vector<int> Model::actionShape() const {
-    return {map_height*map_height};
+    return {1+map_height*map_width};
 }
 
-int Model::encodeAction(ABS::Gamestate* state, int* decoded_action, bool* valid) {
-    bool cell = getCell(dynamic_cast<GOL::Gamestate*>(state)->board, decoded_action[0] / map_height, decoded_action[0] % map_height, map_height);
-    *valid = action_mode == ActionMode::ALL ||
-             (action_mode == ActionMode::SAVE_ONLY && cell) ||
-             (action_mode == ActionMode::REVIVE_ONLY && !cell);
-    return decoded_action[0];
+int Model::encodeAction(int* decoded_action) {
+    return decoded_action[0]-1;
 }
 
 
@@ -146,7 +142,7 @@ double Model::getDistance(const ABS::Gamestate* a, const ABS::Gamestate* b) cons
 ABS::Gamestate* Model::getInitialState(int num) {
         std::vector<int> state_codes = {
             // 197,
-            453,
+            30169386,
             //281 //manually chosen state numbers in which aupo gets neither 100% nor 0% accuraccy and the best contenders can be grouped
         };
         auto state_string = "(("+std::to_string(state_codes[num % state_codes.size()]) + "),(0,0,0))";

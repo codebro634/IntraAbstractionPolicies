@@ -4,11 +4,58 @@
 #include "../include/Arena.h"
 #include "../include/Utils/AgentMaker.h"
 #include "../include/Utils/ModelMaker.h"
-#include "../include/Agents/LookupTableAgent.h"
+#include "../include/Agents/Oga/OgaAgent.h"
+#include "../include/Agents/Mcts/MctsAgent.h"
+#include "../include/Agents/RandomAgent.h"
+#include "../include/Games/MDPs/Traffic.h"
+#include "../include/Agents/HumanAgent.h"
+#include "../include/Agents/OneStepLookahead.h"
+#include "../include/Agents/SparseSamplingAgent.h"
+#include "../include/Agents/Mcts/MctsAgent.h"
+#include "../include/Games/TwoPlayerGames/TicTacToe.h"
+#include "../include/Games/MDPs/SailingWind.h"
+#include "../include/Games/TwoPlayerGames/Chess.h"
+#include "../include/Games/TwoPlayerGames/Constrictor.h"
+#include "../include/Games/TwoPlayerGames/Pylos.h"
+#include "../include/Games/TwoPlayerGames/Quarto.h"
+#include "../include/Games/MDPs/Navigation.h"
+#include "../include/Games/MDPs/SkillsTeaching.h"
+#include "../include/Games/MDPs/PushYourLuck.h"
+#include "../include/Games/MDPs/SysAdmin.h"
+#include "../include/Games/MDPs/TriangleTireworld.h"
+#include "../include/Games/Wrapper/MultiPlayerToMDP.h"
+#include "../include/Games/MDPs/RedFinnedBlueEye.h"
+#include "../include/Games/MDPs/EarthObservation.h"
+#include "../include/Games/MDPs/WildlifePreserve.h"
+#include "../include/Games/MDPs/Manufacturer.h"
+#include "../include/Games/MDPs/GameOfLife.h"
+#include "../include/Games/MDPs/Wildfire.h"
+#include "../include/Games/MDPs/JoinFive.h"
+#include "../include/Games/MDPs/Tamarisk.h"
+#include "../include/Games/TwoPlayerGames/CaptureTheFlag.h"
 #include "../include/Games/Wrapper/FiniteHorizon.h"
+#include "../include/Games/MDPs/Saving.h"
+#include "../include/Games/MDPs/GraphTraversal.h"
+#include "../include/Games/MDPs/Elevators.h"
+#include "../include/Games/MDPs/RaceTrack.h"
+#include "../include/Games/MDPs/CrossingTraffic.h"
+#include "../include/Games/TwoPlayerGames/KillTheKing.h"
+#include "../include/Games/MDPs/AcademicAdvising.h"
+#include "../include/Games/TwoPlayerGames/Constrictor.h"
+#include "../include/Games/MDPs/MultiArmedBandit.h"
+#include "../include/Games/MDPs/CooperativeRecon.h"
+#include "../include/Games/TwoPlayerGames/NumbersRace.h"
+#include "../include/Games/MDPs/ToySoccer.h"
 #include "../include/Utils/Argparse.h"
+#include "../include/Games/TwoPlayerGames/Connect4.h"
+#include "../include/Games/TwoPlayerGames/Othello.h"
+#include "../include/Games/Wrapper/RandomStart.h"
+#include "../include/Games/Wrapper/Determinization.h"
+#include "../include/Games/Wrapper/HeuristicsAsReward.h"
 #include "../include/Utils/Distributions.h"
 #include "../include/Utils/ValueIteration.h"
+
+#include <cstdlib>
 
 void debug(){
 
@@ -56,10 +103,25 @@ int main(const int argc, char **argv) {
         .default_value(false)
         .implicit_value(true);
 
+    program.add_argument("-omit_times", "--omit_times")
+        .help("Whether to omit times in the output")
+        .default_value(false)
+        .implicit_value(true);
+
     program.add_argument("-p_horizon", "--p_horizon")
         .help("Planning horizon")
         .action([](const std::string &value) { return std::stoi(value); })
         .default_value(50);
+
+    program.add_argument("-rng_save_path","--rng_save_path")
+    .help("Path for saving the latest rng state")
+    .action([](const std::string &value) { return value; })
+    .default_value("");
+
+    program.add_argument("-rng_load_path","--rng_load_path")
+    .help("If specified the rng state will be loaded from this file. If not specified, the rng will be seeded with the seed argument.")
+    .action([](const std::string &value) { return value; })
+    .default_value("");
 
     program.add_argument("-e_horizon", "--e_horizon")
     .help("Execution horizon")
@@ -80,6 +142,11 @@ int main(const int argc, char **argv) {
     .default_value(false)
     .implicit_value(true);
 
+    program.add_argument("-episode_num_offset", "--episode_num_offset")
+            .help("The episode number of the output is shifted by this offset.")
+            .action([](const std::string &value) { return std::stoi(value); })
+            .default_value(0);
+
     if (argc == 1) {
         std::cout << "Since no arguments were provided, for IDE convenience, the debug function will be called." << std::endl;
         debug();
@@ -88,8 +155,27 @@ int main(const int argc, char **argv) {
 
     program.parse_args(argc, argv);
 
+    /*
+     * Setup RNG state
+     */
+
+    //Default is seeded
     const auto seed = program.get<int>("--seed");
     std::mt19937 rng(seed);
+
+    //If --rng_load_path is specified, load the RNG state from the file
+    const auto rng_load_path = program.get<std::string>("--rng_load_path");
+    if (!rng_load_path.empty()) {
+
+        std::ifstream in(rng_load_path);
+        if (!in) {
+            std::cerr << "Failed to open file for reading the RNG state.\n";
+            throw std::runtime_error("Failed to open file for reading the RNG state.");
+            return 1;
+        }
+        in >> rng;
+        in.close();
+    }
 
     auto* model = getModel(program.get<std::string>("--model"), program.get<std::vector<std::string>>("--margs"));
     if (model == nullptr ) {
@@ -116,7 +202,10 @@ int main(const int argc, char **argv) {
     }
 
     const auto conf_range = program.get<double>("--required_conf_range");
-    playGames(*model, program.get<int>("--n_games"), agent_list, rng, program.get<bool>("--csv") ? CSV: VERBOSE, horizons,  planning_beyond_execution_horizon, random_init_state,conf_range, &Q_map);
+    const auto rng_save_path = program.get<std::string>("--rng_save_path");
+    playGames(model, program.get<int>("--n_games"),
+        agent_list, rng, program.get<bool>("--csv") ? ( program.get<bool>("--omit_times")? CSV_OMIT_TIMES : CSV) : VERBOSE, horizons,
+        planning_beyond_execution_horizon, random_init_state,conf_range, &Q_map, rng_save_path, program.get<int>("--episode_num_offset"));
 
     //Cleanup
     delete model;

@@ -30,13 +30,12 @@ void Model::getObs(ABS::Gamestate* uncasted_state, int* obs) {
     return shape;
 }
 
-int Model::encodeAction(ABS::Gamestate* state, int* decoded_action, bool* valid) {
+int Model::encodeAction(int* decoded_action) {
     int action = 0;
     for (size_t i = 0; i < die_probs.size(); i++) {
         if (decoded_action[i] == 1)
             action |= (1 << i);
     }
-    *valid = true;
     return action;
 }
 

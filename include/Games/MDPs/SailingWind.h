@@ -52,7 +52,7 @@ namespace SW
         ABS::Gamestate* copyState(ABS::Gamestate* uncasted_state) override;
         int getNumPlayers() override;
         bool hasTransitionProbs() override {return true;}
-        double heuristicsValue(ABS::Gamestate* state) const override;
+        std::vector<double> heuristicsValue(ABS::Gamestate* state) override;
 
         [[nodiscard]] double getMinV(int steps) const override {return -6*steps;}
         [[nodiscard]] double getMaxV(int steps) const override {return -6;}
@@ -63,7 +63,7 @@ namespace SW
         [[nodiscard]] std::vector<int> obsShape() const override;
         void getObs(ABS::Gamestate* uncasted_state, int* obs) override;
         [[nodiscard]] std::vector<int> actionShape() const override;
-        [[nodiscard]] int encodeAction(ABS::Gamestate* state, int* decoded_action, bool* valid) override;
+        [[nodiscard]] int encodeAction(int* decoded_action) override;
 
     private:
         int ROWS,COLS;

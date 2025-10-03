@@ -12,11 +12,6 @@
 
 using namespace OGA;
 
-unsigned OgaAbstractNode::max_id = 0;
-
-OgaAbstractNode::OgaAbstractNode(const unsigned depth) : id(max_id++), depth(depth)
-{}
-
 unsigned OgaAbstractNode::getId() const{
     return id;
 }
@@ -90,7 +85,7 @@ void OgaAbstractStateNode::remove(OgaStateNode* state_node){
         OgaStateNode *representant = nullptr;
         unsigned min_id = std::numeric_limits<unsigned>::max();
         for (auto* other_node : ground_nodes) { //Min id for reproducibility
-            if (other_node->getId() < min_id) {
+            if (other_node->getId() < min_id || representant == nullptr) {
                 min_id = other_node->getId();
                 representant = other_node;
             }
@@ -131,91 +126,65 @@ double OgaAbstractQStateNode::getVisits() const{
     return visits;
 }
 
-void OgaAbstractQStateNode::transfer(OgaQStateNode* q_state_node, OgaAbstractQStateNode* from,OgaAbstractQStateNode* to, AbsQSet& abs_q_set, bool exact_bookkeeping, OgaBehaviorFlags& flags){
+void OgaAbstractQStateNode::transfer(OgaQStateNode* q_state_node, OgaAbstractQStateNode* from,OgaAbstractQStateNode* to, AbsQSet& abs_q_set,OgaBehaviorFlags& flags){
+
     if (from != to) {
         abs_q_set.erase(to);
-        to->add(q_state_node, exact_bookkeeping);
+        to->add(q_state_node, flags);
         abs_q_set.insert(to);
         if (from != nullptr) {
             abs_q_set.erase(from);
-            from->remove(q_state_node, exact_bookkeeping);
+            from->remove(q_state_node, flags);
             if (from->getCount() > 0){
                 abs_q_set.insert(from);
             }
         }
         q_state_node->setAbstractNode(to);
     }
+
 }
 
-void OgaAbstractQStateNode::add(OgaQStateNode* q_state_node, bool exact_bookkeeping){
+void OgaAbstractQStateNode::add(OgaQStateNode* q_state_node,OgaBehaviorFlags& flags){
     assert (!ground_nodes.contains(q_state_node));
     ground_nodes.insert(q_state_node);
     if (getCount() == 0)
         setRepresentant(q_state_node);
-    if (exact_bookkeeping)
-        _add_exact(q_state_node);
-    else
-        _add_approx(q_state_node);
-}
-
-void OgaAbstractQStateNode::remove(OgaQStateNode* q_state_node, bool exact_bookkeeping){
-    assert (ground_nodes.contains(q_state_node));
-    ground_nodes.erase(q_state_node);
-    if (q_state_node == getRepresentant()) {
-        OgaQStateNode *representant = nullptr;
-        unsigned min_id = std::numeric_limits<unsigned>::max();
-        for (auto* other_node : ground_nodes) { //Min id for reproducibility
-            if (other_node->getId() < min_id) {
-                min_id = other_node->getId();
-                representant = other_node;
-            }
-        }
-        setRepresentant(representant);
-    }
-    if (exact_bookkeeping)
-        _remove_exact(q_state_node);
-    else
-        _remove_approx(q_state_node);
-}
-
-void OgaAbstractQStateNode::_add_approx(const OgaQStateNode* q_state_node){
-    const auto* other_abstract_node = q_state_node->getAbstractNode();
-
-    if (other_abstract_node == nullptr){
-        increaseCount();
-        return;
-    }
-    const auto other_count = other_abstract_node->getCount();
-    const auto other_values = other_abstract_node->getValues();
-
-    this->values += other_values / other_count;
-    this->squared_values += other_abstract_node->squared_values / other_count;
-    visits += other_abstract_node->getVisits() / other_count;
-
-    increaseCount();
-}
-
-void OgaAbstractQStateNode::_remove_approx(const OgaQStateNode* q_state_node)
-{
-    //Paper:  "Maintaining Q-Values and [Visit-]Counts"
-    values -= values / getCount();
-    squared_values -= squared_values / getCount();
-    visits -= visits / getCount();
-    decreaseCount();
-}
-
-void OgaAbstractQStateNode::_add_exact(const OgaQStateNode* q_state_node)
-{
+    assert (getRepresentant() != nullptr);
     visits += q_state_node->getVisits();
     values += q_state_node->getValues();
     squared_values += q_state_node->getSquaredValues();
     increaseCount();
 }
 
-void OgaAbstractQStateNode::_remove_exact(const OgaQStateNode* q_state_node)
-{
+void OgaAbstractQStateNode::remove(OgaQStateNode* q_state_node,OgaBehaviorFlags& flags){
+    assert (ground_nodes.contains(q_state_node));
+
+    if (q_state_node == getRepresentant()) {
+        OgaQStateNode *representant = nullptr;
+        unsigned min_id = std::numeric_limits<unsigned>::max();
+        for (auto* other_node : ground_nodes) { //Min id for reproducibility
+            if (q_state_node != other_node && (other_node->getId() < min_id || representant == nullptr)) {
+                min_id = other_node->getId();
+                representant = other_node;
+            }
+        }
+
+        setRepresentant(representant);
+    }
+
     visits -= q_state_node->getVisits();
     values -= q_state_node->getValues();
     squared_values -= q_state_node->getSquaredValues();
     decreaseCount();
+    ground_nodes.erase(q_state_node);
+
+}
+
+void OgaAbstractQStateNode::testValueConsistency() const{
+    double vsum = 0;
+    for (auto* q_state_node : ground_nodes) {
+        vsum += q_state_node->getValues();
+    }
+    if (std::fabs(vsum - values) > 1e-5)
+        throw std::runtime_error("Inconsistent values in abstract node: " + std::to_string(vsum) + " != " + std::to_string(values));
 }

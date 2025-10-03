@@ -40,11 +40,11 @@ namespace Mcts
             std::mt19937& rng
         );
 
-        int popUntriedAction();
+        int popUntriedAction(double vinit);
 
         void addVisit();
         void addActionVisit(int action);
-        void addActionValues(int action, const std::vector<double>& values);
+        void addActionValues(int action, const std::vector<double>& values, bool max_backup);
 
         [[nodiscard]] std::vector<double>* getActionValues(int action);
 

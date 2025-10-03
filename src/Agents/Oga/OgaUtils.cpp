@@ -9,7 +9,10 @@
 
 using namespace OGA;
 
-NextDistribution::NextDistribution(double rewards) : rewards(rewards) {}
+NextDistribution::NextDistribution(double rewards, bool consider_missing_outcomes) :
+    rewards(rewards),
+    consider_missing_outcomes(consider_missing_outcomes)
+{}
 
 void NextDistribution::addProbability(OgaAbstractStateNode* next_abstract_state_node, const double probability){
     if (!distribution.contains(next_abstract_state_node))
@@ -31,7 +34,7 @@ inline double NextDistribution::rewardDist(const NextDistribution* other) const{
 }
 
 inline double NextDistribution::transDist(const NextDistribution* other) const {
-    double trans_dist = 0;
+
     Map<OgaAbstractStateNode,std::pair<bool,bool>> union_map;
     for(const auto &abs_node: other->getDistribution() | std::views::keys)
         union_map.insert({abs_node,{false,true}});
@@ -41,11 +44,36 @@ inline double NextDistribution::transDist(const NextDistribution* other) const {
         else
             union_map.insert({abs_node,{true,false}});
     }
+
+    // double trans_dist = 0;
+    // double missing_p1 = 1.0;
+    // double missing_p2 = 1.0;
+    // for(auto [abs_node,occurences] : union_map) {
+    //     double p1 = occurences.first ? distribution.at(abs_node) : 0;
+    //     double p2 = occurences.second ? other->getDistribution().at(abs_node) : 0;
+    //     trans_dist += std::fabs(p1 - p2);
+    //     missing_p1 -= p1;
+    //     missing_p2 -= p2;
+    // }
+
+    double trans_dist = 0;
+    double missing_p1 = 1.0;
+    double missing_p2 = 1.0;
+    std::set<std::tuple<double,double,int>> probs = {}; //Doing it this way it a bit slower, but we want reproducibility and iterating over union_map is undefined order
+    int ctr = 0;
     for(auto [abs_node,occurences] : union_map) {
         double p1 = occurences.first ? distribution.at(abs_node) : 0;
         double p2 = occurences.second ? other->getDistribution().at(abs_node) : 0;
-        trans_dist += std::fabs(p1 - p2);
+        probs.insert({p1,p2, ctr++});
     }
+    for (auto [p1,p2,ctr] : probs){
+        trans_dist += std::fabs(p1 - p2);
+        missing_p1 -= p1;
+        missing_p2 -= p2;
+    }
+
+    if (consider_missing_outcomes)
+        trans_dist += missing_p1 + missing_p2;
 
     return trans_dist;
 }
@@ -56,32 +84,6 @@ double NextDistribution::dist(const NextDistribution* other) const {
 
 bool NextDistribution::approxEqual(const NextDistribution* other, double eps_a, double eps_t) const {
     return std::max(rewardDist(other) -  eps_a, 0.0) < 1e-6 && std::max(transDist(other) - eps_t, 0.0) < 1e-6;
-}
-
-bool NextDistribution::operator==(const NextDistribution& other) const{
-
-    if (rewards != other.getRewards())
-        return false;
-
-    const auto& other_distribution = other.getDistribution();
-    for (const auto& [next_abstract_state_node, probability] : distribution){
-        if (!other_distribution.contains(next_abstract_state_node) || std::fabs(probability - other_distribution.at(next_abstract_state_node)) > 1e-6)
-            return false;
-    }
-
-    for (const auto& [next_abstract_state_node, probability] : other_distribution){
-        if (!distribution.contains(next_abstract_state_node) || std::fabs(probability - distribution.at(next_abstract_state_node)) > 1e-6)
-            return false;
-    }
-
-    return true;
-}
-
-size_t NextDistribution::hash() const{
-    size_t hash = 0;
-    for (const auto& next_abstract_state_node : distribution | std::views::keys)
-        hash ^= next_abstract_state_node->hash();
-    return hash;
 }
 
 // NextAbstractQStates

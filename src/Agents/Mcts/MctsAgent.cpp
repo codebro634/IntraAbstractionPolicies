@@ -18,10 +18,13 @@ MctsAgent::MctsAgent(const MctsArgs& args):
     num_rollouts(args.num_rollouts),
     dag(args.dag),
     dynamic_exploration_factor(args.dynamic_exploration_factor),
+    max_backup(args.max_backup),
     rollout_length(args.rollout_length),
     wirsa(args.wirsa),
     a(args.a),
-    b(args.b)
+    b(args.b),
+    puct(args.puct),
+    greedy_decision_policy(args.greedy_decision_policy)
     {}
 
 MctsNode* MctsAgent::buildTree(ABS::Model* model, ABS::Gamestate* state, MctsSearchStats& search_stats, std::mt19937& rng, bool determinize_env, bool determ_var_reduction){
@@ -84,7 +87,7 @@ void MctsAgent::cleanupTree(MctsNode* root){
 int MctsAgent::getAction(ABS::Model* model, ABS::Gamestate* state, std::mt19937& rng){
     MctsSearchStats search_stats;
     auto root = buildTree(model, state, search_stats, rng);
-    const int best_action = selectAction(root, true, rng, search_stats);
+    const int best_action = greedy_decision_policy? selectAction(root, true, rng, search_stats) : sampleAction(root, rng);
     cleanupTree(root);
     return best_action;
 }
@@ -109,7 +112,7 @@ std::vector<std::tuple<MctsNode*,int,std::vector<double>>> MctsAgent::treePolicy
 MctsNode* MctsAgent::selectNode(ABS::Model* model, MctsNode* node, bool& reached_leaf, int& chosen_action, std::vector<double>& rewards,  std::mt19937& rng, MctsSearchStats& search_stats)
 {
     reached_leaf = false;
-    chosen_action = node->isFullyExpanded()? selectAction(node, false, rng, search_stats) : node->popUntriedAction();
+    chosen_action = node->isFullyExpanded()? selectAction(node, false, rng, search_stats) : node->popUntriedAction(max_backup? -std::numeric_limits<double>::infinity() : 0.0);
     auto sample_state = node->getStateCopy();
 
     int determ_seed=0;
@@ -175,6 +178,23 @@ MctsNode* MctsAgent::selectNode(ABS::Model* model, MctsNode* node, bool& reached
     return successor;
 }
 
+int MctsAgent::sampleAction(MctsNode* node,std::mt19937& rng)
+{
+    //sample proportional to visit count
+    double total_visits = 0.0;
+    for (const int action : *node->getTriedActions())
+        total_visits += node->getActionVisits(action);
+
+    std::vector<double> probs = std::vector<double>(node->getTriedActions()->size(), 0.0);
+    int idx = 0;
+    for (const int action : *node->getTriedActions())
+        probs[idx++] = node->getActionVisits(action) / (double)total_visits;
+
+    std::discrete_distribution<> dist(probs.begin(), probs.end());
+    int sampled_action = (*node->getTriedActions())[dist(rng)];
+    return sampled_action;
+}
+
 int MctsAgent::selectAction(MctsNode* node, bool greedy, std::mt19937& rng, MctsSearchStats& search_stats)
 {
     // UCT Formula: w/n + c * sqrt(ln(N)/n)
@@ -198,8 +218,8 @@ int MctsAgent::selectAction(MctsNode* node, bool greedy, std::mt19937& rng, Mcts
     for (const int action : *node->getTriedActions()){
         const auto action_values = node->getActionValues(action);
         const double action_visits = node->getActionVisits(action);
-        const double exploration_term = sqrt(log(node_visits) / action_visits);
-        const double q_value = action_values->at(node->getPlayer()) / action_visits;
+        const double exploration_term = puct? (sqrt(node_visits) / (1 + action_visits)) : (sqrt(log(node_visits) / action_visits));
+        const double q_value = action_values->at(node->getPlayer()) / (max_backup? 1.0 : action_visits);
 
         double exploration_param = node->getDepth() >= static_cast<int>(exploration_parameters.size()) ? exploration_parameters.back() : exploration_parameters[node->getDepth()];
         double score;
@@ -262,20 +282,23 @@ void MctsAgent::backup(std::vector<double> values, std::vector<std::tuple<MctsNo
         for (size_t player = 0; player < values.size(); player++)
             values[player] = values[player] * discount + rewards[player];
 
+        for (size_t player = 0; player < values.size(); player++) {
+            if(parent->getActionVisits(parent_action) >= 1) { //only remove value if it was present before
+                double old_q = parent->getActionValues(parent_action)->at(player) / (max_backup? 1.0 : ((double) parent->getActionVisits(parent_action)));
+                search_stats.total_v[player] -= old_q;
+                search_stats.total_squared_v[player] -= old_q * old_q;
+            }
+        }
+
         parent->addVisit();
         parent->addActionVisit(parent_action);
-        parent->addActionValues(parent_action, values);
+        parent->addActionValues(parent_action, values, max_backup);
 
         if(parent->getActionVisits(parent_action) == 1)
             search_stats.global_num_vs++;
 
         for (size_t player = 0; player < values.size(); player++){
-            if(parent->getActionVisits(parent_action) > 1) { //only remove value if it was present before
-                double old_q = (parent->getActionValues(parent_action)->at(player)-values[player]) / ((double) parent->getActionVisits(parent_action)-1);
-                search_stats.total_v[player] -= old_q;
-                search_stats.total_squared_v[player] -= old_q * old_q;
-            }
-            double q = parent->getActionValues(parent_action)->at(player) / (double) parent->getActionVisits(parent_action);
+            double q = parent->getActionValues(parent_action)->at(player) / (max_backup? 1.0 : (double) parent->getActionVisits(parent_action));
             search_stats.total_v[player] += q;
             search_stats.total_squared_v[player] += q*q;
         }

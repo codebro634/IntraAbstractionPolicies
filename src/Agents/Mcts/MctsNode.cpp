@@ -17,11 +17,11 @@ MctsNode::MctsNode(
     std::ranges::shuffle(untried_actions.begin(), untried_actions.end(), rng);
 }
 
-int MctsNode::popUntriedAction(){
+int MctsNode::popUntriedAction(double vinit){
     int a = untried_actions.back();
     untried_actions.pop_back();
     tried_actions.push_back(a);
-    action_values[a] = std::vector<double>(model->getNumPlayers(), 0);
+    action_values[a] = std::vector<double>(model->getNumPlayers(), vinit);
     action_visits[a] = 0;
     children[a] = {};
     return a;
@@ -37,10 +37,14 @@ void MctsNode::addActionVisit(const int action)
     action_visits[action]++;
 }
 
-void MctsNode::addActionValues(const int action, const std::vector<double>& values)
+void MctsNode::addActionValues(const int action, const std::vector<double>& values, bool max_backup)
 {
-    for (size_t i = 0; i < values.size(); i++)
-        action_values[action][i] += values[i];
+    for (size_t i = 0; i < values.size(); i++) {
+        if (max_backup)
+            action_values[action][i] = std::max(action_values[action][i], values[i]);
+        else
+            action_values[action][i] += values[i];
+    }
 }
 
 bool MctsNode::isFullyExpanded() const

@@ -41,7 +41,7 @@ namespace GOL
         [[nodiscard]] std::vector<int> obsShape() const override;
         void getObs(ABS::Gamestate* uncasted_state, int* obs) override;
         [[nodiscard]] std::vector<int> actionShape() const override;
-        [[nodiscard]] int encodeAction(ABS::Gamestate* state, int* decoded_action, bool* valid) override;
+        [[nodiscard]] int encodeAction(int* decoded_action) override;
 
     private:
         ActionMode action_mode;

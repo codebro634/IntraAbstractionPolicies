@@ -23,12 +23,12 @@ namespace RT
     {
     public:
         ~Model() override = default;
-        explicit Model(const std::string& fileName, double fail_prob, bool reset_at_crash);
+        explicit Model(const std::string& fileName, double fail_prob, bool reset_at_crash, bool simplified_observation_space);
         void printState(ABS::Gamestate* state) override;
         ABS::Gamestate* getInitialState(std::mt19937& rng) override;
         ABS::Gamestate* copyState(ABS::Gamestate* uncasted_state) override;
         int getNumPlayers() override;
-        double heuristicsValue(ABS::Gamestate* state) const override;
+        std::vector<double> heuristicsValue(ABS::Gamestate* state) override;
         bool hasTransitionProbs() override {return true;}
 
         [[nodiscard]] double getMinV(int steps) const override {return -steps;}
@@ -38,7 +38,7 @@ namespace RT
         [[nodiscard]] std::vector<int> obsShape() const override;
         void getObs(ABS::Gamestate* uncasted_state, int* obs) override;
         [[nodiscard]] std::vector<int> actionShape() const override;
-        [[nodiscard]] int encodeAction(ABS::Gamestate* state, int* decoded_action, bool* valid) override;
+        [[nodiscard]] int encodeAction(int* decoded_action) override;
 
     private:
 
@@ -53,6 +53,9 @@ namespace RT
         //for heuristic
         std::map<std::pair<int,int>,int> distances_to_goal;
         void calculate_goal_distances();
+
+        //for ML
+        bool simplified_observation_space;
 
         void resetToStart(Gamestate* state, std::mt19937& rng) const;
         [[nodiscard]] bool valid_pos(int x, int y) const;

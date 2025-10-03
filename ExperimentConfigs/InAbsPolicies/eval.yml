@@ -1,52 +1,104 @@
-seed: 44
-episodes: 5000
+seed: 42
+episodes: 2000
 executable_dry_run: ./cmake-build-debug/BenchmarkGamesDebug
 executable: ./cmake-build-debug/BenchmarkGamesRelease
+omit_times: 1
 
 agents:
 
-  - varying_its:
+  # UCT vs RANDOM
+
+  - random_random_uct:
       agent_type: oga
       agent_args:
-        iterations: [100,200,500,1000,1500,2000]
-        expfac: [ 4 ]
+        iterations: [100,200,500,1000]
+        expfac: [0.5,1,2,4,8,16]
         K: [ 3 ]
-        eps_a: [0,1,2]
-        eps_t: [0,0.4,0.8,1.2,1.6]
+        equiv_chance: [ 0.1,0.2,0.5,1.0 ]
+        q_abs_alg: [ random ]
+        in_abs_policy: [random,uct]
+
+  - oga_pruned_random_uct:
+      agent_type: oga
+      agent_args:
+        iterations: [100,200,500,1000]
+        expfac: [0.5,1,2,4,8,16 ]
+        K: [ 3 ]
+        alpha: [0,0.1,0.2,0.5,0.75,1.0]
         group_partially_expanded_states: [0,1]
         in_abs_policy: [random,uct]
 
-  - 200its:
+  - oga_eps_random_uct:
       agent_type: oga
       agent_args:
-        iterations: [200]
-        expfac: [ 4 ]
-        K: [ 3 ]
-        eps_a: [0,1,2]
-        eps_t: [0,0.4,0.8,1.2,1.6]
+        iterations: [100,200,500,1000]
+        expfac: [0.5,1,2,4,8,16]
+        K: [3]
+        eps_t: [0,0.2,0.4,0.8,1.2,1.6]
         group_partially_expanded_states: [0,1]
-        in_abs_policy: [least_outcomes,random,random_greedy,first,greedy,most_visits,least_visits,uct]
+        eps_a:
+          navigation: [ 0,999999 ]
+          trt: [ 0,999999 ]
+          ct: [ 0,999999 ]
+          aa: [ 0,999999 ]
+          st: [ 0,2,3,999999 ]
+          tam: [ 0,0.5,1.0,999999 ]
+          recon: [ 0,0.5,1.0,999999 ]
+          man: [ 0, 10,20,999999 ]
+          default: [ 0,1,2,999999 ]
+        in_abs_policy: [random,uct]
 
-  - 1000its:
+  # OTHER IN ABS STRATEGIES
+
+  - oga_pruned_all:
       agent_type: oga
       agent_args:
-        iterations: [1000]
-        expfac: [ 4 ]
-        K: [ 3 ]
-        eps_a: [0,1,2]
-        eps_t: [0,0.4,0.8,1.2,1.6]
+        iterations: [100,200,500,1000]
+        expfac: [2]
+        K: [3]
+        alpha: [0,0.1,0.2,0.5,0.75,1.0]
         group_partially_expanded_states: [0,1]
-        in_abs_policy: [least_outcomes,random,random_greedy,first,greedy,most_visits,least_visits,uct]
+        in_abs_policy: [least_outcomes,random_greedy,first,greedy,most_visits,least_visits]
+
+  - oga_eps_all:
+      agent_type: oga
+      agent_args:
+        iterations: [100,200,500,1000]
+        expfac: [2]
+        K: [3]
+        eps_t: [0,0.2,0.4,0.8,1.2,1.6]
+        group_partially_expanded_states: [0,1]
+        eps_a:
+          navigation: [ 0,999999 ]
+          trt: [ 0,999999 ]
+          ct: [ 0,999999 ]
+          aa: [ 0,999999 ]
+          st: [ 0,2,3,999999 ]
+          tam: [ 0,0.5,1.0,999999 ]
+          recon: [ 0,0.5,1.0,999999 ]
+          man: [ 0, 10,20,999999 ]
+          default: [ 0,1,2,999999 ]
+        in_abs_policy: [least_outcomes,random_greedy,first,greedy,most_visits,least_visits]
+
+  - random_random_all:
+      agent_type: oga
+      agent_args:
+        iterations: [ 100,200,500,1000 ]
+        expfac: [ 2 ]
+        K: [ 3 ]
+        equiv_chance: [ 0.1,0.2,0.5,1.0 ]
+        q_abs_alg: [ random ]
+        in_abs_policy: [least_outcomes,random_greedy,first,greedy,most_visits,least_visits]
 
 models:
 
   - ct:
       model_type: ct
       model_args:
-          idle_action: 1
-          width: 4
-          height: 3
-          spawn_rate: 0.5
+        idle_action: 1
+        width: 4
+        height: 3
+        spawn_rate: 0.5
 
   - sa:
       model_type : sa
@@ -57,11 +109,6 @@ models:
       model_type: gol
       model_args:
         map: ./resources/GameOfLifeMaps/3_Anand.txt
-
-  - gol_small:
-      model_type: gol
-      model_args:
-        map: ./resources/GameOfLifeMaps/1_IPPC.txt
 
   - aa:
       model_type: aa
@@ -104,16 +151,6 @@ models:
       model_args:
         size: 15
 
-  - sw_10:
-      model_type: sw
-      model_args:
-        size: 10
-
-  - sw_5:
-      model_type: sw
-      model_args:
-        size: 5
-
   - st:
       model_type: st
       model_args:
@@ -124,6 +161,12 @@ models:
       model_args:
         map: ./resources/TrafficModels/1_IPPC.txt
 
+  - saving:
+      model_type: saving
+      model_args:
+        p: 4
+        t: 4
+
   - trt:
       model_type: trt
       model_args:
@@ -131,14 +174,16 @@ models:
 
 pairings:
 
-  - pair:
-      - agents: [varying_its]
-      - models: [man,tam,sa,st]
+# UCT vs RANDOM in abs
 
   - pair:
-      - agents: [1000its]
-      - models: [aa,eo,ct,gol,man,navigation,recon,rt,sa,st,sw_15,tam,tr,trt]
+      - agents: [random_random_uct, oga_pruned_random_uct, oga_eps_random_uct]
+      - models: [trt,recon,navigation,man,tam,st,ct,gol,aa,sa,tr,eo,sw_15,saving]
+
+# OTHER IN ABS POLICIES
 
   - pair:
-      - agents: [200its]
-      - models: [aa,eo,ct,gol,man,navigation,recon,rt,sa,st,sw_15,tam,tr,trt]
+      - agents: [oga_pruned_all, oga_eps_all, random_random_all]
+      - models: [trt,recon,navigation,man,tam,st,ct,gol,aa,sa,tr,eo,sw_15,saving]
+
+

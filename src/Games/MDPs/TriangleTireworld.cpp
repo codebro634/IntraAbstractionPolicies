@@ -11,7 +11,7 @@ std::vector<int> Model::obsShape() const {
 
 void Model::getObs(ABS::Gamestate* uncasted_state, int* obs) {
     auto state = dynamic_cast<Gamestate*>(uncasted_state);
-    for(size_t i=0;i<connections.size();i++){
+    for(int i=0;i< (int)connections.size();i++){
         obs[i] = state->vehicle_pos == (int)i? 1:0;
         obs[i+connections.size()] = state->spare_tires[i]? 1:0;
     }
@@ -23,24 +23,10 @@ void Model::getObs(ABS::Gamestate* uncasted_state, int* obs) {
     return {size};
 }
 
-int Model::encodeAction(ABS::Gamestate* uncasted_state, int* decoded_action, bool* valid) {
-    auto state = dynamic_cast<Gamestate*>(uncasted_state);
+int Model::encodeAction(int* decoded_action) {
     int action = decoded_action[0];
     if (idle_action)
         action--;
-
-    if (reduced_action_space && action >= 2){
-        bool contained = false;
-        for(int i : connections[state->vehicle_pos]){
-            if (action == 2+i){
-                contained = true;
-                break;
-            }
-        }
-        if (!contained)
-            *valid = false;
-    }
-
     return action;
 }
 
@@ -57,9 +43,10 @@ size_t Gamestate::hash() const {
    return vehicle_pos | (notflattire << 5) | (hasspare << 6) | (hash << 7);
 }
 
-Model::Model(const std::string& filePath, bool idle_action, bool reduced_action_space){
+Model::Model(const std::string& filePath, bool idle_action, bool reduced_action_space, bool big_payoff){
     this->reduced_action_space = reduced_action_space;
     this->idle_action = idle_action;
+    this->big_payoff = big_payoff;
 
     std::ifstream in(filePath);
     if(!in.is_open()){
@@ -196,7 +183,7 @@ std::pair<std::vector<double>,double> Model::applyAction_(ABS::Gamestate* uncast
     double reward;
     if(oldState.vehicle_pos == goal_loc) {
         newState->terminal = true;
-        reward = 100;
+        reward = big_payoff? 100 : 1;
     }else
         reward = -1;
 

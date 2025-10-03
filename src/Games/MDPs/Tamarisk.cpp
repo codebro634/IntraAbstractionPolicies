@@ -34,7 +34,7 @@ void Model::getObs(ABS::Gamestate* uncasted_state, int* obs){
     return {num_reaches * 2 + 1};
 }
 
-int Model::encodeAction(ABS::Gamestate* state, int* decoded_action, bool* valid) {
+int Model::encodeAction(int* decoded_action) {
     assert (!COMBINATORIAL_ACTION_SPACE);
     return decoded_action[0];
 }

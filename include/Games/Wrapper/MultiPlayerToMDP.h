@@ -14,6 +14,8 @@ namespace MPTOMDP
 
     struct Gamestate: public ABS::Gamestate{
         ABS::Gamestate* ground_state;
+        int opponent_seed;
+
         bool operator==(const ABS::Gamestate& other) const override;
         [[nodiscard]] size_t hash() const override;
 
@@ -26,7 +28,7 @@ namespace MPTOMDP
     {
     public:
         ~Model() override;
-        explicit Model(ABS::Model* original_model,std::map<int,Agent*> agents, double discount, int player, bool deterministic_opponents);
+        explicit Model(ABS::Model* original_model,std::map<int,Agent*> agents, double discount, int player, bool deterministic_opponents, bool free_ground_model);
         void printState(ABS::Gamestate* state) override;
         ABS::Gamestate* getInitialState(std::mt19937& rng) override;
         ABS::Gamestate* getInitialState(int num) override;
@@ -46,8 +48,12 @@ namespace MPTOMDP
             original_model->getObs(dynamic_cast<Gamestate*>(uncasted_state)->ground_state, obs);
         }
 
-        [[nodiscard]] int encodeAction(ABS::Gamestate* state, int* decoded_action, bool* valid) override {
-            return original_model->encodeAction(dynamic_cast<Gamestate*>(state)->ground_state, decoded_action, valid);
+        [[nodiscard]] int encodeAction(int* decoded_action) override {
+            return original_model->encodeAction(decoded_action);
+        }
+
+        [[nodiscard]] std::vector<double> heuristicsValue(ABS::Gamestate* uncasted_state) override{
+            return {original_model->heuristicsValue(dynamic_cast<Gamestate*>(uncasted_state)->ground_state)[player]};
         }
 
     private:
@@ -56,8 +62,7 @@ namespace MPTOMDP
         double discount;
         int player;
         bool deterministic_opponents;
-
-        const static int ENEMY_SEED = 42;
+        bool free_ground_model;
 
         std::pair<double,double> playTillNextTurn(Gamestate* state, std::mt19937& rng);
 

@@ -27,7 +27,7 @@ void Model::getObs(ABS::Gamestate* uncasted_state, int* obs) {
     return idle_action? std::vector<int>({5}) : std::vector<int>({4});
 }
 
-int Model::encodeAction(ABS::Gamestate* state, int* decoded_action, bool* valid) {
+int Model::encodeAction(int* decoded_action) {
     return decoded_action[0] - idle_action;
 }
 
@@ -39,8 +39,7 @@ Model::Model() {
     idle_action = false;
 }
 
-Model::Model(int width, int height, float spawn_rate, bool idle_action)
-{
+Model::Model(int width, int height, float spawn_rate, bool idle_action){
     this->width = width;
     this->height = height;
     this->spawn_rate = spawn_rate;
@@ -123,7 +122,7 @@ std::pair<std::vector<double>,double> Model::applyAction_(ABS::Gamestate* uncast
         }
 
         //move robot
-        if(obstacle_in_lane(state->obstacles[state->y], state->x)) {
+        if(state->x != -1 && obstacle_in_lane(state->obstacles[state->y], state->x)) {
             state->x = -1; //robot is removed from the map if it collides with an obstacle
             state->y = -1;
         }else if(state->x != -1) {
