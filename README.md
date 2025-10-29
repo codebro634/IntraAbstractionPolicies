@@ -4,6 +4,22 @@
 This is the repository accompanying the paper "Investigating intra-abstraction policies for non-exact
 abstraction algorithms" which contains the code to reproduce the experiments and the results of the paper.
 
+## Cite this work
+
+If you use this work, please cite it as:
+
+```bibtex
+@misc{schmöcker2025investigatingintraabstractionpoliciesnonexact,
+      title={Investigating Intra-Abstraction Policies For Non-exact Abstraction Algorithms}, 
+      author={Robin Schmöcker and Alexander Dockhorn and Bodo Rosenhahn},
+      year={2025},
+      eprint={2510.24297},
+      archivePrefix={arXiv},
+      primaryClass={cs.AI},
+      url={https://arxiv.org/abs/2510.24297}, 
+}
+```
+
 ## Abstract
 
 One weakness of Monte Carlo Tree Search (MCTS) is its sample efficiency which
